@@ -981,12 +981,13 @@
    (Firebase Console → Configurações do projeto → Seus apps → SDK setup)
    ===================================================================== */
 const firebaseConfig = {
-  apiKey: "AIzaSyBufElH_OgW0zuB2njAUzHdhRbp_g7OhWo",
-  authDomain: "passagem-operacional.firebaseapp.com",
-  projectId: "passagem-operacional",
-  storageBucket: "passagem-operacional.firebasestorage.app",
-  messagingSenderId: "813263527466",
-  appId: "1:813263527466:web:d59bf1a46af5df3a916d53"
+  apiKey: "AIzaSyBYdATcEEPHl6Dx7PdAJb4leFFIVNSmrJA",
+  authDomain: "comunicativo-b31d7.firebaseapp.com",
+  projectId: "comunicativo-b31d7",
+  storageBucket: "comunicativo-b31d7.firebasestorage.app",
+  messagingSenderId: "579993458101",
+  appId: "1:579993458101:web:0c291218a546210c4df5fc",
+  measurementId: "G-8EKP1BNWGT"
 };
 
 const SENHA_CORRETA = "CD30SECOS";
@@ -1061,6 +1062,17 @@ function iniciarFirebase(){
 }
 iniciarFirebase();
 
+// Rede de segurança: qualquer erro não tratado em qualquer lugar do app
+// aparece como um toast (em vez de falhar em silêncio e deixar a tela
+// travada sem explicação nenhuma). Ajuda a diagnosticar problemas futuros.
+window.addEventListener("unhandledrejection", e=>{
+  console.error("Erro não tratado (promise):", e.reason);
+  try{ mostrarToast("Erro inesperado", (e.reason && e.reason.message) || String(e.reason), "erro"); }catch(_){}
+});
+window.addEventListener("error", e=>{
+  console.error("Erro não tratado:", e.error || e.message);
+});
+
 /* ---------------------- DATA / CABEÇALHO ---------------------- */
 function formatarDataHoje(){
   const hoje = new Date();
@@ -1082,21 +1094,41 @@ function preencherData(){
 /* ---------------------- LOGIN ---------------------- */
 document.getElementById("btn-entrar").addEventListener("click", tentarEntrar);
 document.getElementById("in-senha").addEventListener("keydown", e=>{ if(e.key==="Enter") tentarEntrar(); });
+document.getElementById("in-senha-cargo").addEventListener("keydown", e=>{ if(e.key==="Enter") tentarEntrar(); });
 
-function tentarEntrar(){
+async function tentarEntrar(){
   const usuario = document.getElementById("in-usuario").value.trim();
   const senha = document.getElementById("in-senha").value;
   const senhaCargoDigitada = document.getElementById("in-senha-cargo").value;
   const erro = document.getElementById("erro-login");
+  const btn = document.getElementById("btn-entrar");
   if(!usuario){ erro.textContent = "Digite seu nome de usuário."; return; }
   if(senha !== SENHA_CORRETA){ erro.textContent = "Senha incorreta."; return; }
   erro.textContent = "";
+  btn.disabled = true;
+  const textoOriginalBtn = btn.textContent;
+  btn.textContent = "Entrando…";
   pedirPermissaoNotificacao(); // pedido feito dentro do clique do usuário (gesto)
   usuarioAtual = usuario;
   const cargoSolicitado = cargoPelaSenha(senhaCargoDigitada); // null, "ADM", "Encarregado" ou "Conferente"
-  sessionStorage.setItem("cargasPiso_usuario", usuario);
-  sessionStorage.setItem("cargasPiso_cargoSolicitado", cargoSolicitado || "");
-  entrarNoPainel(cargoSolicitado);
+  try{
+    await entrarNoPainel(cargoSolicitado);
+    sessionStorage.setItem("cargasPiso_usuario", usuario);
+    sessionStorage.setItem("cargasPiso_cargoSolicitado", cargoSolicitado || "");
+  }catch(e){
+    // Se algo falhar ao conectar (ex.: sem permissão no Firestore, sem
+    // internet), volta para a tela de login em vez de deixar o app
+    // travado numa tela em branco/quebrada — e mostra o motivo real.
+    console.error("Erro ao entrar no painel:", e);
+    document.getElementById("tela-painel").style.display = "none";
+    document.getElementById("tela-login").style.display = "flex";
+    document.getElementById("btn-chat-fab").classList.remove("visivel");
+    usuarioAtual = null;
+    erro.textContent = "Não foi possível entrar: " + (e && e.message ? e.message : "erro desconhecido") + ". Verifique sua internet e tente de novo.";
+  }finally{
+    btn.disabled = false;
+    btn.textContent = textoOriginalBtn;
+  }
 }
 
 async function entrarNoPainel(cargoSolicitado){
@@ -1136,7 +1168,7 @@ function escutarMeuUsuario(){
     sessionStorage.removeItem("cargasPiso_cargoSolicitado");
     alert("Você foi removido do painel por um administrador.");
     location.reload();
-  });
+  }, err=> console.error("Erro ao escutar meu usuário:", err));
 }
 
 // Cria o registro do usuário na primeira vez que ele entra (cargo padrão:
@@ -1233,7 +1265,7 @@ function escutarPresenca(){
       inativos.forEach(ref=> lote.delete(ref));
       lote.commit().catch(()=>{});
     }
-  });
+  }, err=> console.error("Erro ao escutar presença:", err));
 }
 
 function renderizarOnline(){
@@ -1254,7 +1286,7 @@ function escutarUsuarios(){
       mapaCargos[doc.id] = d.cargo || CARGO_PADRAO;
     });
     renderizarOnline(); // já atualiza a lista online e, se ADM, a lista de gerenciamento
-  });
+  }, err=> console.error("Erro ao escutar usuários:", err));
 }
 
 function renderizarListaAdmin(linhas){
@@ -1789,7 +1821,7 @@ function escutarPendencias(){
     pendenciasAtual = novoDado;
     renderizarPendencias();
     primeiraPendSnapshot = false;
-  });
+  }, err=> console.error("Erro ao escutar pendências:", err));
 }
 
 // Marca (ou desmarca) uma linha de pendência de agrupamento cross como
@@ -1950,7 +1982,11 @@ function comLabelExpira(criadoEm){
 }
 
 function escutarComentarios(){
-  if(!firebaseOk) return;
+  if(!firebaseOk){
+    const cont = document.getElementById("chat-mensagens");
+    if(cont) cont.innerHTML = '<div class="chat-vazio">Sem conexão com o servidor.</div>';
+    return;
+  }
   if(unsubComentarios) unsubComentarios();
   unsubComentarios = db.collection("comentarios").orderBy("criadoEm").limitToLast(200)
     .onSnapshot(snap=>{
@@ -2030,7 +2066,10 @@ document.getElementById("btn-chat-fechar").addEventListener("click", ()=>{
 });
 document.getElementById("form-chat").addEventListener("submit", (e)=>{
   e.preventDefault();
-  if(!firebaseOk || !usuarioAtual) return;
+  if(!firebaseOk || !usuarioAtual){
+    alert("Sem conexão com o servidor — não é possível enviar mensagens agora.");
+    return;
+  }
   const input = document.getElementById("in-chat-texto");
   const texto = input.value.trim();
   if(!texto) return;
@@ -2084,7 +2123,7 @@ function escutarConfigTurno(){
     inFull.disabled = !podeDistribuir();
     inMix.disabled = !podeDistribuir();
     renderizarGradeDistribuicao(linhasCargasAtual);
-  });
+  }, err=> console.error("Erro ao escutar config do turno:", err));
 }
 
 function salvarConfigTurno(campo, valor){
