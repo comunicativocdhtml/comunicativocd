@@ -1,0 +1,2545 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cargas no Piso — CD Secos</title>
+
+<!-- ===================== FIREBASE (COMPAT SDK) ===================== -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<!-- SheetJS: usado para gerar o arquivo Excel (.xlsx) -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<style>
+  :root{
+    --asfalto: #16181a;
+    --asfalto-2: #1d2023;
+    --painel: #24282c;
+    --painel-2: #2b3035;
+    --linha: #383e44;
+    --texto: #e8e6df;
+    --texto-fraco: #9aa0a6;
+    --faixa: #f4b400;
+    --faixa-escura: #c98f00;
+    --ok: #2e7d4f;
+    --ok-bg: #1b3324;
+    --alerta: #b8860b;
+    --alerta-bg: #332a12;
+    --pendente: #b23b3b;
+    --pendente-bg: #331717;
+    --mono: 'IBM Plex Mono', 'Courier New', monospace;
+    --disp: 'Oswald', 'Arial Narrow', sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    background:var(--asfalto);
+    color:var(--texto);
+    font-family:'Inter',sans-serif;
+    background-image:
+      repeating-linear-gradient(135deg, rgba(244,180,0,0.025) 0 2px, transparent 2px 14px);
+  }
+
+  /* ===================== LOGIN ===================== */
+  #tela-login{
+    height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .cartao-login{
+    background:var(--painel);
+    border:1px solid var(--linha);
+    border-top:6px solid var(--faixa);
+    padding:40px 36px 32px;
+    width:320px;
+    box-shadow:0 20px 50px rgba(0,0,0,0.5);
+  }
+  .cartao-login .rotulo{
+    font-family:var(--disp);
+    letter-spacing:3px;
+    font-size:12px;
+    color:var(--faixa);
+    text-transform:uppercase;
+    margin-bottom:4px;
+  }
+  .cartao-login h1{
+    font-family:var(--disp);
+    font-weight:700;
+    font-size:26px;
+    letter-spacing:0.5px;
+    margin:0 0 28px;
+    text-transform:uppercase;
+    line-height:1.15;
+  }
+  .cartao-login h1 span{color:var(--faixa);}
+  .campo{margin-bottom:16px;}
+  .campo label{
+    display:block;
+    font-size:11px;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    color:var(--texto-fraco);
+    margin-bottom:6px;
+  }
+  .campo input{
+    width:100%;
+    background:var(--asfalto-2);
+    border:1px solid var(--linha);
+    color:var(--texto);
+    padding:11px 12px;
+    font-size:15px;
+    font-family:var(--mono);
+  }
+  .campo input:focus{outline:none;border-color:var(--faixa);}
+  #btn-entrar{
+    width:100%;
+    margin-top:8px;
+    padding:12px;
+    background:var(--faixa);
+    color:#1a1a1a;
+    border:none;
+    font-family:var(--disp);
+    font-weight:600;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    font-size:13px;
+    cursor:pointer;
+  }
+  #btn-entrar:hover{background:var(--faixa-escura);}
+  #erro-login{color:var(--pendente);font-size:12.5px;margin-top:10px;min-height:16px;}
+
+  /* ===================== TOPO / PAINEL ===================== */
+  #tela-painel{display:none;min-height:100vh;padding:20px 26px 60px;}
+
+  .barra-topo{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    border-bottom:2px solid var(--faixa);
+    padding-bottom:12px;
+    margin-bottom:18px;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  .titulo-app{
+    font-family:var(--disp);
+    font-size:20px;
+    font-weight:700;
+    letter-spacing:1px;
+    text-transform:uppercase;
+  }
+  .titulo-app small{
+    display:block;
+    font-family:'Inter',sans-serif;
+    font-weight:400;
+    letter-spacing:0.5px;
+    color:var(--texto-fraco);
+    font-size:11px;
+    text-transform:none;
+  }
+  .topo-direita{display:flex;align-items:center;gap:18px;}
+  .online-lista{display:flex;align-items:center;gap:8px;font-size:12.5px;flex-wrap:wrap;}
+  .online-tag{
+    background:var(--painel-2);
+    border:1px solid var(--ok);
+    color:var(--texto);
+    padding:4px 9px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .ponto-verde{width:7px;height:7px;border-radius:50%;background:#3fd47a;box-shadow:0 0 6px #3fd47a;}
+  .botao{
+    background:var(--painel-2);
+    border:1px solid var(--linha);
+    color:var(--texto);
+    padding:8px 14px;
+    font-size:12.5px;
+    font-family:var(--disp);
+    letter-spacing:1px;
+    text-transform:uppercase;
+    cursor:pointer;
+  }
+  .botao:hover{border-color:var(--faixa);}
+  .botao.principal{background:var(--faixa);color:#1a1a1a;border-color:var(--faixa);font-weight:600;}
+  .botao.principal:hover{background:var(--faixa-escura);}
+
+  /* ===================== RESUMO ===================== */
+  .resumo{
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:1px;
+    background:var(--linha);
+    margin-bottom:18px;
+    border:1px solid var(--linha);
+  }
+  .resumo .item{
+    background:var(--painel);
+    padding:14px 16px;
+  }
+  .resumo .item .num{
+    font-family:var(--mono);
+    font-size:26px;
+    font-weight:600;
+    color:var(--faixa);
+    line-height:1.1;
+  }
+  .resumo .item .lbl{
+    font-size:10.5px;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    color:var(--texto-fraco);
+    margin-top:4px;
+  }
+
+  /* ===================== TABELA ===================== */
+  .caixa-tabela{
+    background:var(--painel);
+    border:1px solid var(--linha);
+    overflow-x:auto;
+  }
+  table{border-collapse:collapse;width:100%;min-width:1180px;font-size:12.8px;}
+  thead th{
+    background:var(--asfalto-2);
+    color:var(--faixa);
+    font-family:var(--disp);
+    font-weight:600;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    font-size:11px;
+    padding:10px 8px;
+    text-align:left;
+    border-bottom:2px solid var(--faixa);
+    white-space:nowrap;
+    position:sticky;top:0;
+  }
+  tbody td{
+    border-bottom:1px solid var(--linha);
+    padding:0;
+    vertical-align:middle;
+  }
+  tbody tr:hover{background:rgba(244,180,0,0.05);}
+  td .cel{
+    padding:8px 8px;
+    min-height:16px;
+    background:transparent;
+    border:1px solid transparent;
+    color:var(--texto);
+    width:100%;
+    font-family:'Inter',sans-serif;
+    font-size:12.8px;
+  }
+  td input.cel{border:1px solid transparent;}
+  td .cel:focus{outline:none;border-color:var(--faixa);background:var(--asfalto-2);}
+  td select.cel{
+    padding:7px 6px;
+    font-weight:600;
+    cursor:pointer;
+    -webkit-appearance:none;appearance:none;
+  }
+  .col-num .cel{font-family:var(--mono);text-align:right;}
+  .col-remover{text-align:center;width:34px;}
+  .btn-remover{
+    background:none;border:none;color:var(--texto-fraco);cursor:pointer;font-size:16px;line-height:1;
+  }
+  .btn-remover:hover{color:var(--pendente);}
+
+  .status-aguardando{background:rgba(154,160,166,0.16)!important;color:#c7ccd1!important;}
+  .status-etiquetada{background:var(--ok-bg)!important;color:#7de3a4!important;}
+  .status-parcial{background:rgba(244,148,53,0.16)!important;color:#f4a054!important;}
+  .status-parcial-dist{background:rgba(122,158,235,0.16)!important;color:#8fb0f0!important;}
+  .status-processo{background:var(--alerta-bg)!important;color:#f0c674!important;}
+  .status-pendente{background:var(--pendente-bg)!important;color:#f19b9b!important;}
+  .status-conferencia{background:rgba(158,122,235,0.16)!important;color:#b79bf0!important;}
+
+  tfoot td{
+    font-family:var(--mono);
+    font-weight:600;
+    padding:10px 8px;
+    border-top:2px solid var(--faixa);
+    color:var(--faixa);
+    background:var(--asfalto-2);
+  }
+
+  .rodape-acoes{display:flex;justify-content:space-between;align-items:center;margin-top:14px;}
+  .aviso-sync{font-size:11.5px;color:var(--texto-fraco);font-family:var(--mono);}
+  .aviso-sync.ativo{color:#3fd47a;}
+
+  /* ===================== IMPRESSÃO ===================== */
+  @media print{
+    body{background:#fff;color:#000;}
+    .barra-topo, .rodape-acoes, .resumo .item .lbl, .btn-remover, .col-remover, .online-lista, .topo-direita .botao{display:none!important;}
+    .caixa-tabela{border:1px solid #000;}
+    thead th{background:#eee!important;color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    td .cel, td select.cel{color:#000!important;}
+    .status-etiquetada,.status-parcial,.status-parcial-dist,.status-processo,.status-pendente,.status-aguardando,.status-conferencia{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    table.grade td.cel-hora-dist input.cel{border:none!important;color:#000!important;background:transparent!important;}
+  }
+
+  @media (max-width:760px){
+    #tela-painel{padding:12px 10px 50px;}
+
+    /* ---- Topo ---- */
+    .barra-topo{padding-bottom:10px;}
+    .titulo-app{font-size:16px;}
+    .topo-direita{width:100%;justify-content:flex-start;gap:8px;}
+    .topo-direita .botao{padding:9px 12px;font-size:12px;flex:1 1 auto;text-align:center;}
+    .online-lista{order:5;width:100%;}
+
+    /* ---- Resumo ---- */
+    .resumo{grid-template-columns:repeat(2,1fr);}
+    .resumo .item .num{font-size:22px;}
+
+    /* ---- Ações do rodapé em botões grandes e empilhados ---- */
+    .rodape-acoes{flex-direction:column;align-items:stretch;gap:10px;}
+    .rodape-acoes > div{display:grid!important;grid-template-columns:1fr 1fr;gap:8px;}
+    .rodape-acoes .botao{padding:12px 10px;font-size:12px;text-align:center;}
+    .aviso-sync{text-align:center;}
+
+    /* ---- Tabela "Cargas no Piso" vira lista de cartões (fonte maior) ---- */
+    .caixa-tabela{overflow-x:visible;border:none;background:transparent;}
+    table#tabela-cargas{min-width:0;}
+    #tabela-cargas thead{display:none;}
+    #tabela-cargas tfoot{display:none;}
+    #tabela-cargas, #tabela-cargas tbody{display:block;width:100%;}
+    #tabela-cargas tbody tr{
+      display:flex;flex-direction:column;position:relative;
+      background:var(--painel);border:1px solid var(--linha);border-left:4px solid var(--faixa);
+      border-radius:6px;margin-bottom:16px;padding:16px 16px 6px;
+      box-shadow:0 3px 12px rgba(0,0,0,.3);
+    }
+    #tabela-cargas tbody td{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+      border-bottom:1px dashed var(--linha);padding:12px 0;
+      font-size:15.5px;order:20;
+    }
+    #tabela-cargas tbody td:last-child{border-bottom:none;}
+    #tabela-cargas tbody td::before{
+      content:attr(data-label);
+      font-family:var(--disp);font-size:11.5px;letter-spacing:1px;text-transform:uppercase;
+      color:var(--texto-fraco);flex:0 0 auto;
+    }
+    #tabela-cargas tbody td .cel{width:auto;flex:1 1 auto;text-align:right;font-size:15.5px;padding:6px 4px;}
+    #tabela-cargas tbody td.col-num .cel{text-align:right;font-size:16px;}
+    #tabela-cargas tbody td select.cel{text-align:right;direction:rtl;font-size:14.5px;}
+
+    /* Carga e Fornecedor viram o "cabeçalho" do cartão, em destaque */
+    #tabela-cargas tbody td[data-label="Carga"]{
+      order:1;border-bottom:none;padding:0 0 6px;
+    }
+    #tabela-cargas tbody td[data-label="Carga"]::before{font-size:11px;}
+    #tabela-cargas tbody td[data-label="Carga"] .cel{
+      font-size:23px;font-weight:700;color:var(--faixa);font-family:var(--mono);text-align:right;
+    }
+    #tabela-cargas tbody td[data-label="Fornecedor"]{
+      order:2;flex-direction:column;align-items:flex-start;gap:2px;
+      padding:0 0 12px;margin-bottom:8px;border-bottom:1px solid var(--linha);
+    }
+    #tabela-cargas tbody td[data-label="Fornecedor"]::before{font-size:10.5px;}
+    #tabela-cargas tbody td[data-label="Fornecedor"] .cel{
+      font-size:16.5px;font-weight:600;text-align:left;color:var(--texto);width:100%;padding:2px 0 0;
+    }
+
+    /* Status em destaque, seletor grande e fácil de tocar */
+    #tabela-cargas tbody td[data-label="Status"]{
+      order:3;flex-direction:column;align-items:stretch;gap:6px;padding:12px 0;
+    }
+    #tabela-cargas tbody td[data-label="Status"] select.cel{
+      font-size:15px;padding:12px 10px;text-align:left;direction:ltr;font-weight:700;width:100%;
+    }
+
+    /* Observação: texto livre, fica embaixo e por extenso */
+    #tabela-cargas tbody td[data-label="Obs."]{
+      order:19;flex-direction:column;align-items:flex-start;gap:4px;
+    }
+    #tabela-cargas tbody td[data-label="Obs."] .cel{text-align:left;font-size:14.5px;width:100%;}
+
+    #tabela-cargas tbody td[data-label="Produtivo"]{order:4;}
+    #tabela-cargas tbody td[data-label="Doca"]{order:5;}
+    #tabela-cargas tbody td[data-label="Liberação"]{order:6;}
+    #tabela-cargas tbody td[data-label="Hora"]{order:7;}
+    #tabela-cargas tbody td[data-label="D-1"]{order:8;}
+    #tabela-cargas tbody td[data-label="Volume"]{order:9;}
+    #tabela-cargas tbody td[data-label="SKU"]{order:10;}
+    #tabela-cargas tbody td[data-label="Departamento"]{order:11;}
+
+    #tabela-cargas tbody td.col-remover{
+      order:0;position:absolute;top:10px;right:10px;border-bottom:none;padding:0;width:auto;
+    }
+    #tabela-cargas tbody td.col-remover::before{display:none;}
+    #tabela-cargas tbody .btn-remover{
+      width:30px;height:30px;border-radius:50%;background:var(--asfalto-2);
+      border:1px solid var(--linha);font-size:15px;
+    }
+
+    /* ---- Seleção de Cargas: ajustes finos de toque no celular ---- */
+    #corpo-selecao{gap:8px;}
+    .linha-selecao{padding:12px;font-size:12.5px;}
+    .linha-selecao .circulo-dist{width:34px;height:34px;}
+    .linha-selecao .hora-marcada{font-size:13px;}
+
+    /* ---- Configuração de turno em coluna única ---- */
+    .linha-config{flex-direction:column;align-items:stretch;gap:10px;}
+    .linha-config input{width:100%;}
+
+    /* ---- Grade de distribuição: mantém rolagem lateral, com dica ---- */
+    .grade-wrap{position:relative;-webkit-overflow-scrolling:touch;}
+    .grade-cabecalho{font-size:12px;}
+    .grade-cabecalho::after{
+      content:"◂ arraste para o lado ▸";
+      display:block;width:100%;font-family:'Inter',sans-serif;font-weight:400;
+      font-size:10px;letter-spacing:0.3px;color:#cfd6e8;text-transform:none;opacity:.8;
+    }
+    table.grade{font-size:11px;}
+
+    .rodape-grade{flex-direction:column;}
+    .rodape-grade .botao{width:100%;text-align:center;}
+
+    .secao-titulo{margin:26px 0 10px;font-size:14px;}
+  }
+
+  /* ---- Em telas bem estreitas, um cartão de carga por linha ---- */
+  @media (max-width:420px){
+    #corpo-selecao{grid-template-columns:1fr;}
+  }
+
+  /* ===================== MODAL COLAR PLANILHA ===================== */
+  .modal-fundo{
+    display:none;
+    position:fixed;top:0;left:0;right:0;bottom:0;
+    background:rgba(0,0,0,0.65);
+    z-index:100;
+    align-items:center;justify-content:center;
+  }
+  .modal-fundo.aberto{display:flex;}
+  .modal-caixa{
+    background:var(--painel);
+    border:1px solid var(--linha);
+    border-top:6px solid var(--faixa);
+    width:min(640px, 92vw);
+    padding:26px 28px 22px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.6);
+  }
+  .modal-caixa h2{
+    font-family:var(--disp);
+    text-transform:uppercase;
+    letter-spacing:1px;
+    margin:0 0 12px;
+    font-size:18px;
+  }
+  .modal-texto{font-size:12.8px;color:var(--texto-fraco);line-height:1.5;margin:0 0 14px;}
+  .modal-texto strong{color:var(--faixa);font-weight:600;}
+  #area-colar{
+    width:100%;
+    height:180px;
+    background:var(--asfalto-2);
+    border:1px solid var(--linha);
+    color:var(--texto);
+    font-family:var(--mono);
+    font-size:12.5px;
+    padding:10px;
+    resize:vertical;
+  }
+  #area-colar:focus{outline:none;border-color:var(--faixa);}
+  .modal-botoes{display:flex;justify-content:flex-end;gap:10px;margin-top:16px;flex-wrap:wrap;}
+
+  /* ===================== SEÇÃO DE DISTRIBUIÇÃO ===================== */
+  .secao-titulo{
+    font-family:var(--disp);
+    font-size:16px;
+    font-weight:700;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--faixa);
+    margin:34px 0 12px;
+    padding-top:20px;
+    border-top:2px solid var(--linha);
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+  }
+  .secao-titulo .direita{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .select-turno, .linha-config input[type=number], .linha-config input[type=text]{
+    background:var(--asfalto-2);border:1px solid var(--linha);color:var(--texto);
+    padding:8px 10px;font-family:var(--mono);font-size:12.5px;
+  }
+  .select-turno:focus, .linha-config input:focus{outline:none;border-color:var(--faixa);}
+
+  .aviso-permissao{font-size:11.5px;color:var(--texto-fraco);font-family:var(--mono);margin-bottom:10px;}
+
+  .lista-selecao{background:var(--painel);border:1px solid var(--linha);padding:10px;}
+  /* ---- Seleção de Cargas — 2 cartões por linha, cada cartão com a carga inteira ---- */
+  .cabecalho-selecao{display:none;}
+  #corpo-selecao{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+  .linha-selecao{
+    display:flex;flex-direction:column;gap:3px;
+    padding:14px;position:relative;font-size:13.5px;
+    background:var(--asfalto-2);border:1px solid var(--linha);border-radius:6px;
+  }
+  .linha-selecao .campo-doca::before{content:"Doca ";color:var(--texto-fraco);font-size:10.5px;text-transform:uppercase;}
+  .linha-selecao .campo-carga::before{content:"Carga ";color:var(--texto-fraco);font-size:10.5px;text-transform:uppercase;}
+  .linha-selecao .campo-volume::before{content:"Vol ";color:var(--texto-fraco);font-size:10.5px;text-transform:uppercase;}
+  .linha-selecao .campo-sku::before{content:"SKU ";color:var(--texto-fraco);font-size:10.5px;text-transform:uppercase;}
+  .linha-selecao .campo-carga{font-size:16px;font-weight:700;color:var(--faixa);font-family:var(--mono);}
+  .linha-selecao .campo-fornecedor{font-weight:600;font-size:14.5px;margin-top:2px;}
+  .linha-selecao .campo-status{font-size:12.5px;margin-top:2px;}
+  .linha-selecao .bloco-circulo{justify-content:flex-start;margin-top:8px;gap:10px;}
+  .linha-selecao:hover{background:rgba(244,180,0,0.08);}
+  .linha-selecao.ja-distribuida{opacity:0.42;}
+  .linha-selecao .col-num{font-family:var(--mono);}
+  .linha-selecao .status-mini{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;}
+  .linha-selecao .status-mini.ok{color:#7de3a4;}
+  .linha-selecao .status-mini.espera{color:var(--texto-fraco);}
+  .bloco-circulo{display:flex;align-items:center;justify-content:center;gap:8px;}
+  .circulo-dist{
+    width:24px;height:24px;border-radius:50%;
+    border:2px solid var(--texto-fraco);
+    background:transparent;cursor:pointer;
+    transition:all .15s;
+    flex:0 0 auto;
+  }
+  .circulo-dist:hover:not(:disabled){border-color:var(--faixa);}
+  .circulo-dist.marcado{background:var(--ok);border-color:var(--ok);box-shadow:0 0 8px rgba(46,125,79,.6);}
+  .circulo-dist:disabled{cursor:not-allowed;opacity:.35;}
+  .hora-marcada{font-family:var(--mono);font-size:11px;color:var(--texto-fraco);}
+  .circulo-dist-mini{
+    width:18px;height:18px;border-radius:50%;
+    border:2px solid var(--texto-fraco);
+    background:transparent;cursor:pointer;
+    transition:all .15s; flex:0 0 auto;
+  }
+  .circulo-dist-mini:hover:not(:disabled){border-color:var(--faixa);}
+  .circulo-dist-mini.marcado{background:#3b7fb2;border-color:#3b7fb2;box-shadow:0 0 6px rgba(59,127,178,.6);}
+  .circulo-dist-mini:disabled{cursor:not-allowed;opacity:.35;}
+  table.pend tr.pend-tratada{opacity:.42;}
+  table.pend td.col-tratada{white-space:nowrap;}
+  .tratada-por{font-family:var(--mono);font-size:10px;color:var(--texto-fraco);margin-left:6px;}
+
+  .linha-config{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+  .linha-config .campo-config{display:flex;flex-direction:column;gap:4px;}
+  .linha-config label{color:var(--texto-fraco);letter-spacing:.8px;text-transform:uppercase;font-size:10.5px;}
+  .linha-config input{width:110px;}
+
+  .grade-wrap{background:var(--painel);border:1px solid var(--linha);overflow-x:auto;}
+  .grade-cabecalho{
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;
+    background:#1f2c47;color:#fff;padding:10px 14px;
+    font-family:var(--disp);font-weight:700;letter-spacing:1px;text-transform:uppercase;font-size:14px;
+  }
+  .grade-cabecalho .data-hora{font-family:var(--mono);font-weight:500;font-size:12.5px;letter-spacing:0.5px;}
+  table.grade{border-collapse:collapse;width:100%;min-width:920px;font-size:12.5px;}
+  table.grade th, table.grade td{border:1px solid var(--linha);padding:7px 8px;text-align:center;}
+  table.grade thead th{
+    background:var(--asfalto-2);color:var(--faixa);font-family:var(--disp);
+    font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;white-space:nowrap;
+  }
+  table.grade td.desc{text-align:left;font-weight:600;}
+  table.grade td.painel{background:#2b3a5c;color:#fff;font-weight:700;}
+  table.grade td.painel.rotulo{background:#3b4a6b;font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;}
+  table.grade tfoot td{background:#000;color:#fff;font-weight:700;font-family:var(--mono);}
+  table.grade input.painel-input{
+    width:70px;background:transparent;border:none;color:#fff;text-align:center;font-weight:700;
+    font-family:var(--mono);font-size:12.5px;
+  }
+  table.grade input.painel-input:focus{outline:1px solid var(--faixa);}
+  table.grade td.cel-hora-dist input.cel{
+    width:100%;max-width:70px;background:transparent;border:1px solid transparent;
+    color:var(--texto);text-align:center;font-family:var(--mono);font-size:12.5px;padding:2px 4px;
+  }
+  table.grade td.cel-hora-dist input.cel:hover{border-color:var(--linha);}
+  table.grade td.cel-hora-dist input.cel:focus{outline:none;border-color:var(--faixa);background:var(--asfalto-2);}
+
+  .rodape-grade{display:flex;justify-content:flex-end;gap:10px;margin-top:12px;flex-wrap:wrap;}
+
+  /* ===================== MODAL: ADICIONAR CARGA NA GRADE ===================== */
+  .grade-form-grid{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:6px;}
+  .grade-form-grid .campo-config{display:flex;flex-direction:column;gap:4px;}
+  .grade-form-grid .campo-config.full{flex:1 1 100%;}
+  .grade-form-grid label{color:var(--texto-fraco);letter-spacing:.8px;text-transform:uppercase;font-size:10.5px;}
+  .grade-form-grid input, .grade-form-grid select{
+    width:130px;background:var(--asfalto-2);border:1px solid var(--linha);color:var(--texto);
+    padding:8px 10px;font-family:var(--mono);font-size:12.5px;
+  }
+  .grade-form-grid .campo-config.full input{width:100%;}
+  .grade-form-grid input:focus, .grade-form-grid select:focus{outline:none;border-color:var(--faixa);}
+
+  /* ===================== PENDÊNCIAS AGRUPAMENTO CROSS ===================== */
+  .pend-cabecalho{
+    display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;
+    background:var(--painel);border:1px solid var(--linha);border-bottom:none;padding:12px 14px;
+  }
+  .pend-info{display:flex;gap:22px;flex-wrap:wrap;}
+  .pend-info .bloco{font-size:12px;}
+  .pend-info .bloco .rot{color:var(--texto-fraco);letter-spacing:1px;text-transform:uppercase;font-size:10px;margin-bottom:2px;}
+  .pend-info .bloco .val{font-family:var(--mono);font-weight:600;}
+  .pend-atualizado{font-family:var(--mono);font-size:11px;color:var(--texto-fraco);white-space:nowrap;}
+  table.pend{border-collapse:collapse;width:100%;min-width:820px;font-size:12.5px;}
+  table.pend th, table.pend td{border:1px solid var(--linha);padding:7px 8px;text-align:center;}
+  table.pend thead th{
+    background:#1f2c47;color:#fff;font-family:var(--disp);font-weight:600;
+    font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;white-space:nowrap;
+  }
+  table.pend td.fornecedor{text-align:left;font-weight:600;}
+  table.pend td.pct-baixo{background:var(--pendente-bg);color:#ff9b9b;font-weight:700;}
+  table.pend td.turno-marcado{background:#2b3a5c;color:#fff;font-weight:700;}
+  .pend-vazio{padding:20px;text-align:center;color:var(--texto-fraco);font-size:12.5px;background:var(--painel);border:1px solid var(--linha);border-top:none;}
+
+  /* ===================== TOASTS / NOTIFICAÇÕES ===================== */
+  .toast-container{
+    position:fixed; top:14px; right:14px; z-index:9999;
+    display:flex; flex-direction:column; gap:8px;
+    max-width:340px;
+  }
+  .toast{
+    background:var(--painel-2); border:1px solid var(--linha); border-left:4px solid var(--ok);
+    color:var(--texto); font-size:12.5px; line-height:1.4;
+    padding:10px 12px; border-radius:4px;
+    box-shadow:0 6px 18px rgba(0,0,0,.35);
+    animation:toast-in .25s ease-out;
+  }
+  .toast.saindo{animation:toast-out .25s ease-in forwards;}
+  .toast b{color:var(--faixa);}
+  .toast .toast-sub{color:var(--texto-fraco); font-size:11px; margin-top:2px;}
+  .toast.tipo-tratada{border-left-color:#3b7fb2;}
+  @keyframes toast-in{from{opacity:0; transform:translateX(24px);} to{opacity:1; transform:translateX(0);}}
+  @keyframes toast-out{from{opacity:1; transform:translateX(0);} to{opacity:0; transform:translateX(24px);}}
+  @media print{ .toast-container{display:none!important;} }
+
+  @media print{
+    .secao-titulo .direita .botao, .linha-selecao .circulo-dist, .rodape-grade, .aviso-permissao{display:none!important;}
+    /* A Seleção de Cargas é uma tela de trabalho, não um relatório —
+       nunca aparece em nenhum dos três "prints/PDFs" abaixo. */
+    #secao-titulo-selecao, .lista-selecao{display:none!important;}
+    .rodape-acoes, .topo-direita .botao, .online-lista{display:none!important;}
+    /* Cada botão de imprimir marca o <body> com uma classe (ver JS) para
+       que só a seção correspondente apareça no PDF/impressão gerado. */
+    body.imprimir-so-piso #secao-grade,
+    body.imprimir-so-piso #secao-pend{display:none!important;}
+    body.imprimir-so-grade #secao-piso,
+    body.imprimir-so-grade #secao-pend{display:none!important;}
+    body.imprimir-so-pend #secao-piso,
+    body.imprimir-so-pend #secao-grade{display:none!important;}
+  }
+
+  /* ===================== COMUNICADOR (CHAT FLUTUANTE, laranja/preto, mensagens somem em 7h) ===================== */
+  :root{
+    --com-preto: #0b0a09;
+    --com-preto-2: #151310;
+    --com-laranja: #ff6a1a;
+    --com-laranja-escura: #cc5313;
+    --com-linha: #2a2620;
+    --com-texto: #f3ede0;
+    --com-texto-fraco: #8a8374;
+  }
+  .chat-fab{
+    position:fixed;right:22px;bottom:22px;z-index:200;
+    width:56px;height:56px;border-radius:50%;
+    background:var(--com-laranja);color:#1a0d02;border:none;
+    font-size:24px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.45);
+    display:none;align-items:center;justify-content:center;
+    transition:transform .15s;
+  }
+  .chat-fab.visivel{ display:flex; }
+  .chat-fab:hover{transform:scale(1.06);}
+  .chat-fab.tem-novo{box-shadow:0 0 0 4px rgba(255,106,26,0.35),0 6px 18px rgba(0,0,0,.45);}
+  .chat-fab.tem-novo::after{
+    content:"";position:absolute;top:2px;right:2px;width:12px;height:12px;
+    border-radius:50%;background:var(--pendente);border:2px solid var(--com-preto);
+  }
+  .chat-painel{
+    position:fixed;right:22px;bottom:90px;z-index:200;
+    width:340px;max-width:88vw;height:min(460px,62vh);
+    background:var(--com-preto-2);border:1px solid var(--com-linha);border-top:4px solid var(--com-laranja);
+    border-radius:8px;display:none;flex-direction:column;overflow:hidden;
+    box-shadow:0 20px 50px rgba(0,0,0,.55);
+  }
+  .chat-painel.aberto{display:flex;}
+  .chat-cabecalho{
+    padding:10px 14px;font-family:var(--disp);text-transform:uppercase;letter-spacing:1px;
+    font-size:13px;color:var(--com-laranja);border-bottom:1px solid var(--com-linha);
+    display:flex;align-items:center;justify-content:space-between;flex:0 0 auto;
+  }
+  .chat-cabecalho .sub{
+    display:block;font-family:'Inter',sans-serif;text-transform:none;letter-spacing:0;
+    color:var(--com-texto-fraco);font-size:10.5px;margin-top:2px;
+  }
+  .chat-fechar{background:none;border:none;color:var(--com-texto-fraco);font-size:16px;cursor:pointer;line-height:1;}
+  .chat-fechar:hover{color:var(--com-texto);}
+  .chat-mensagens{flex:1 1 auto;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;}
+  .chat-msg{background:var(--com-preto);border:1px solid var(--com-linha);border-radius:6px;padding:7px 10px;font-size:13px;color:var(--com-texto);}
+  .chat-msg.minha{border-color:var(--com-laranja-escura);}
+  .chat-msg .chat-autor{font-weight:700;color:var(--com-laranja);font-size:11.5px;}
+  .chat-msg .chat-hora{color:var(--com-texto-fraco);font-size:10px;margin-left:6px;}
+  .chat-msg .chat-expira{color:var(--com-texto-fraco);font-size:9.5px;float:right;opacity:0.75;}
+  .chat-msg .chat-texto{margin-top:2px;word-wrap:break-word;white-space:pre-wrap;}
+  .chat-vazio{color:var(--com-texto-fraco);font-size:12px;text-align:center;padding:24px 0;}
+  .chat-form{display:flex;gap:6px;padding:10px;border-top:1px solid var(--com-linha);flex:0 0 auto;}
+  .chat-form input{
+    flex:1 1 auto;background:var(--com-preto);border:1px solid var(--com-linha);color:var(--com-texto);
+    padding:8px 10px;font-size:13px;border-radius:4px;font-family:'Inter',sans-serif;
+  }
+  .chat-form input:focus{outline:none;border-color:var(--com-laranja);}
+  .chat-form .botao{
+    padding:8px 14px;font-size:12.5px;background:var(--com-laranja);color:#1a0d02;
+    border:1px solid var(--com-laranja);
+  }
+  .chat-form .botao:hover{background:var(--com-laranja-escura);border-color:var(--com-laranja-escura);}
+  @media print{ .chat-fab, .chat-painel{display:none!important;} }
+  @media (max-width:480px){
+    .chat-painel{right:10px;left:10px;width:auto;bottom:84px;}
+    .chat-fab{right:16px;bottom:16px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== TOASTS / NOTIFICAÇÕES ===================== -->
+<div id="toast-container" class="toast-container"></div>
+
+<!-- ===================== TELA DE LOGIN ===================== -->
+<div id="tela-login">
+  <div class="cartao-login">
+    <div class="rotulo">Página Inicial</div>
+    <h1>Cargas no <span>Piso</span><br>CD Secos</h1>
+    <div class="campo">
+      <label for="in-usuario">Usuário</label>
+      <input id="in-usuario" type="text" autocomplete="off" placeholder="Seu nome">
+    </div>
+    <div class="campo">
+      <label for="in-senha">Senha</label>
+      <input id="in-senha" type="password" autocomplete="off" placeholder="••••••••">
+    </div>
+    <div class="campo">
+      <label for="in-senha-cargo">Senha de cargo (opcional)</label>
+      <input id="in-senha-cargo" type="password" autocomplete="off" placeholder="Só preencha se for Encarregado, Conferente ou ADM">
+    </div>
+    <button id="btn-entrar">Entrar</button>
+    <div id="erro-login"></div>
+  </div>
+</div>
+
+<!-- ===================== TELA PRINCIPAL ===================== -->
+<div id="tela-painel">
+  <div class="barra-topo">
+    <div class="titulo-app">
+      Cargas no Piso — CD Secos
+      <small id="sub-data"></small>
+    </div>
+    <div class="topo-direita">
+      <span id="meu-cargo" style="font-size:11.5px;color:var(--texto-fraco);font-family:var(--mono);"></span>
+      <div class="online-lista" id="lista-online"></div>
+      <button class="botao" id="btn-gerenciar-usuarios" style="display:none;">Usuários</button>
+      <button class="botao" id="btn-imprimir">Imprimir</button>
+      <button class="botao" id="btn-sair">Sair</button>
+    </div>
+  </div>
+
+  <div id="secao-piso">
+  <div class="resumo">
+    <div class="item"><div class="num" id="r-total-cargas">0</div><div class="lbl">Total de Cargas</div></div>
+    <div class="item"><div class="num" id="r-etiquetadas">0</div><div class="lbl">Cargas Etiquetadas</div></div>
+    <div class="item"><div class="num" id="r-volumes">0</div><div class="lbl">Volumes</div></div>
+    <div class="item"><div class="num" id="r-sku">0</div><div class="lbl">SKU</div></div>
+    <div class="item"><div class="num" id="r-data">—</div><div class="lbl" id="r-data-lbl">Data</div></div>
+  </div>
+
+  <div class="caixa-tabela">
+    <table id="tabela-cargas">
+      <thead>
+        <tr>
+          <th>Produtivo</th>
+          <th>Doca</th>
+          <th>Carga</th>
+          <th>Fornecedor</th>
+          <th>Liberação</th>
+          <th>Hora</th>
+          <th>D-1</th>
+          <th>Volume</th>
+          <th>SKU</th>
+          <th>Departamento</th>
+          <th>Status</th>
+          <th>Obs.</th>
+          <th class="col-remover"></th>
+        </tr>
+      </thead>
+      <tbody id="corpo-tabela"></tbody>
+      <tfoot>
+        <tr>
+          <td colspan="7" style="text-align:right;">VOLUME TOTAL</td>
+          <td class="col-num" id="f-volume">0</td>
+          <td id="f-sku">0</td>
+          <td colspan="4"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  </div>
+
+  <div class="rodape-acoes">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="botao principal" id="btn-add-linha">+ Adicionar Carga</button>
+      <button class="botao" id="btn-abrir-colar">Colar Planilha</button>
+      <button class="botao" id="btn-baixar-html">Baixar HTML</button>
+      <button class="botao" id="btn-baixar-excel">Baixar Excel</button>
+      <button class="botao" id="btn-zerar-dia" style="border-color:var(--pendente);color:var(--pendente);display:none;">Zerar Painel (Novo Dia)</button>
+    </div>
+    <span class="aviso-sync" id="aviso-sync">conectando…</span>
+  </div>
+  <div style="display:flex;justify-content:flex-end;margin-top:-6px;">
+    <button class="botao" id="btn-notif-status" style="font-size:11px;padding:5px 10px;">🔔 Notificações: verificando…</button>
+  </div>
+
+  <!-- ===================== SELEÇÃO DE CARGAS PARA DISTRIBUIÇÃO ===================== -->
+  <div class="secao-titulo" id="secao-titulo-selecao">
+    Seleção de Cargas — Distribuição
+    <div class="direita">
+      <label style="font-size:10.5px;color:var(--texto-fraco);letter-spacing:1px;text-transform:uppercase;">Turno</label>
+      <select class="select-turno" id="sel-turno">
+        <option value="T1">T1</option>
+        <option value="T2" selected>T2</option>
+        <option value="T3">T3</option>
+      </select>
+    </div>
+  </div>
+  <p class="aviso-permissao" id="aviso-permissao-dist"></p>
+  <div class="lista-selecao">
+    <div class="cabecalho-selecao">
+      <span>Doca</span><span>Carga</span><span>Fornecedor</span><span>Volume</span><span>SKU</span><span>Status</span><span>Distribuir</span>
+    </div>
+    <div id="corpo-selecao"></div>
+  </div>
+
+  <!-- ===================== GRADE DE DISTRIBUIÇÃO ===================== -->
+  <div id="secao-grade">
+  <div class="secao-titulo">
+    Grade de Distribuição
+    <div class="direita">
+      <button class="botao principal" id="btn-grade-add-carga" style="display:none;">+ Adicionar Carga na Grade</button>
+    </div>
+  </div>
+  <div class="linha-config">
+    <div class="campo-config">
+      <label for="in-qtd-produtivos">Qtd. Produtivos</label>
+      <input type="number" id="in-qtd-produtivos" min="0" placeholder="ex: 8">
+    </div>
+    <div class="campo-config">
+      <label for="in-estocado-full">Estocado Full</label>
+      <input type="text" id="in-estocado-full" placeholder="opcional">
+    </div>
+    <div class="campo-config">
+      <label for="in-estocado-mix">Estocado Mix</label>
+      <input type="text" id="in-estocado-mix" placeholder="opcional">
+    </div>
+  </div>
+  <div class="grade-wrap">
+    <div class="grade-cabecalho">
+      <span id="grade-titulo">DISTRIBUIÇÃO T2</span>
+      <span class="data-hora" id="grade-data-hora"></span>
+    </div>
+    <table class="grade" id="tabela-grade">
+      <thead>
+        <tr>
+          <th>Etiquetagem</th><th>Doca</th><th>Carga</th><th>Descrição</th><th>Liberação</th>
+          <th>D-1</th><th>Volume</th><th>SKU</th><th>Hora Dist.</th><th>Qtd Produtivos</th><th>Qtd Cargas</th>
+        </tr>
+      </thead>
+      <tbody id="corpo-grade"></tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3" style="text-align:left;">DISTRIBUIÇÃO TOTAL <span id="grade-total-turno">T2</span></td>
+          <td colspan="3"></td>
+          <td id="grade-total-volume">0</td>
+          <td id="grade-total-sku">0</td>
+          <td colspan="3"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  <div class="rodape-grade">
+    <button class="botao" id="btn-grade-baixar-html">Baixar HTML</button>
+    <button class="botao" id="btn-grade-baixar-excel">Baixar Excel</button>
+    <button class="botao" id="btn-grade-imprimir">Imprimir Grade</button>
+  </div>
+  </div>
+
+  <!-- ===================== PENDÊNCIAS AGRUPAMENTO CROSS ===================== -->
+  <div id="secao-pend">
+  <div class="secao-titulo">
+    Pendências Agrupamento Cross
+    <div class="direita">
+      <button class="botao" id="btn-pend-abrir-colar" style="display:none;">Colar Planilha</button>
+      <button class="botao" id="btn-pend-imprimir" style="display:none;">Imprimir / Salvar PDF</button>
+    </div>
+  </div>
+  <p class="aviso-permissao" id="aviso-permissao-pend"></p>
+  <div class="pend-cabecalho" id="pend-cabecalho" style="display:none;">
+    <div class="pend-info">
+      <div class="bloco"><div class="rot">Status</div><div class="val" id="pend-status">—</div></div>
+      <div class="bloco"><div class="rot">Tipo Carga</div><div class="val" id="pend-tipo-carga">—</div></div>
+    </div>
+    <div class="pend-atualizado" id="pend-atualizado"></div>
+  </div>
+  <div class="caixa-tabela" id="pend-caixa-tabela" style="display:none;">
+    <table class="pend" id="tabela-pend">
+      <thead>
+        <tr>
+          <th>Carga</th><th>Fornecedor</th><th>Aging</th><th>Vol</th>
+          <th>Montada</th><th>Agrupada</th><th>%</th><th>Turno</th><th>Linha</th><th>Tratada</th>
+        </tr>
+      </thead>
+      <tbody id="corpo-pend"></tbody>
+    </table>
+  </div>
+  <div class="pend-vazio" id="pend-vazio">Nenhuma planilha de pendências colada ainda.</div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: ADICIONAR CARGA NA GRADE (ADM / ENCARREGADO) ===================== -->
+<div id="modal-grade-add" class="modal-fundo">
+  <div class="modal-caixa">
+    <h2>Adicionar Carga na Grade</h2>
+    <p class="modal-texto">
+      Adiciona uma carga direto na Grade de Distribuição do turno escolhido, sem precisar passar pela lista de "Cargas no Piso". Disponível apenas para <strong>ADM</strong> e <strong>Encarregado</strong>.
+    </p>
+    <div class="grade-form-grid">
+      <div class="campo-config"><label for="ga-turno">Turno</label>
+        <select id="ga-turno"><option value="T1">T1</option><option value="T2">T2</option><option value="T3">T3</option></select>
+      </div>
+      <div class="campo-config"><label for="ga-doca">Doca</label><input type="text" id="ga-doca"></div>
+      <div class="campo-config"><label for="ga-carga">Carga</label><input type="text" id="ga-carga"></div>
+      <div class="campo-config full"><label for="ga-descricao">Descrição / Fornecedor</label><input type="text" id="ga-descricao"></div>
+      <div class="campo-config"><label for="ga-liberacao">Liberação</label><input type="text" id="ga-liberacao" placeholder="dd/mm/aaaa"></div>
+      <div class="campo-config"><label for="ga-d1">D-1</label><input type="text" id="ga-d1"></div>
+      <div class="campo-config"><label for="ga-volume">Volume</label><input type="number" id="ga-volume"></div>
+      <div class="campo-config"><label for="ga-sku">SKU</label><input type="number" id="ga-sku"></div>
+      <div class="campo-config"><label for="ga-hora">Hora Dist.</label><input type="text" id="ga-hora" placeholder="hh:mm"></div>
+    </div>
+    <div class="modal-botoes">
+      <button class="botao" id="btn-grade-add-cancelar">Cancelar</button>
+      <button class="botao principal" id="btn-grade-add-salvar">Adicionar à Grade</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: COLAR PLANILHA — PENDÊNCIAS AGRUPAMENTO CROSS ===================== -->
+<div id="modal-pend-colar" class="modal-fundo">
+  <div class="modal-caixa">
+    <h2>Colar Planilha — Pendências Agrupamento Cross</h2>
+    <p class="modal-texto">
+      Copie o bloco inteiro da planilha (incluindo as linhas de Status, Tipo Carga, data/hora e o cabeçalho <strong>Carga, Fornecedor, Aging, Vol...</strong>) e cole aqui embaixo. Cada nova colagem substitui a tabela de pendências atual.
+    </p>
+    <textarea id="area-pend-colar" placeholder="Cole aqui o bloco copiado do Excel (Ctrl+V)…"></textarea>
+    <div class="modal-botoes">
+      <button class="botao" id="btn-pend-cancelar-colar">Cancelar</button>
+      <button class="botao principal" id="btn-pend-substituir-colar">Atualizar Pendências</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: COLAR PLANILHA ===================== -->
+<div id="modal-colar" class="modal-fundo">
+  <div class="modal-caixa">
+    <h2>Colar Planilha</h2>
+    <p class="modal-texto">
+      Copie as linhas no Excel (sem a linha de cabeçalho) na ordem:
+      <strong>Produtivo, Doca, Carga, Fornecedor, Liberação, Hora, D-1, Volume, SKU, Departamento, Status, Obs.</strong>
+      e cole aqui embaixo.
+    </p>
+    <textarea id="area-colar" placeholder="Cole aqui o bloco copiado do Excel (Ctrl+V)…"></textarea>
+    <div class="modal-botoes">
+      <button class="botao" id="btn-cancelar-colar">Cancelar</button>
+      <button class="botao" id="btn-adicionar-colar">Adicionar ao Final</button>
+      <button class="botao principal" id="btn-substituir-colar">Atualizar Relatório</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: GERENCIAR USUÁRIOS (SÓ ADM) ===================== -->
+<div id="modal-usuarios" class="modal-fundo">
+  <div class="modal-caixa">
+    <h2>Gerenciar Usuários</h2>
+    <p class="modal-texto">
+      Defina o cargo de cada pessoa que já entrou no painel, ou remova alguém do servidor. Só administradores veem esta tela. Quem estiver offline há mais de 35s some sozinho da lista de "online" e tem a presença apagada automaticamente — a bolinha ao lado do nome mostra o status atual.
+    </p>
+    <div id="lista-usuarios-admin" style="max-height:340px;overflow-y:auto;"></div>
+    <div class="modal-botoes">
+      <button class="botao" id="btn-fechar-usuarios">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   CONFIGURAÇÃO DO FIREBASE
+   Substitua o objeto abaixo pelo firebaseConfig do SEU projeto Firebase.
+   (Firebase Console → Configurações do projeto → Seus apps → SDK setup)
+   ===================================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyBufElH_OgW0zuB2njAUzHdhRbp_g7OhWo",
+  authDomain: "passagem-operacional.firebaseapp.com",
+  projectId: "passagem-operacional",
+  storageBucket: "passagem-operacional.firebasestorage.app",
+  messagingSenderId: "813263527466",
+  appId: "1:813263527466:web:d59bf1a46af5df3a916d53"
+};
+
+const SENHA_CORRETA = "CD30SECOS";
+
+// Senhas secretas de cargo. Quem digitar uma dessas senhas no campo
+// "Senha de cargo" no login já entra promovido para o cargo correspondente.
+// TROQUE por senhas só suas — qualquer um que souber uma dessas senhas
+// consegue virar esse cargo (ou reassumir esse cargo depois de rebaixado).
+const SENHA_ADMIN = "SECOSADM2026";
+const SENHA_ENCARREGADO = "EncarregadoCD30SECOS";
+const SENHA_CONFERENTE = "ConferenteCD30SECOS";
+
+// Mapa senha de cargo -> cargo. A ordem importa: se a senha bater com
+// mais de um cargo (não deveria acontecer), o primeiro da lista vence.
+const SENHAS_CARGO = [
+  { cargo: "ADM", senha: SENHA_ADMIN },
+  { cargo: "Encarregado", senha: SENHA_ENCARREGADO },
+  { cargo: "Conferente", senha: SENHA_CONFERENTE }
+];
+
+function cargoPelaSenha(senhaDigitada){
+  if(!senhaDigitada) return null;
+  const encontrado = SENHAS_CARGO.find(item=> senhaDigitada === item.senha);
+  return encontrado ? encontrado.cargo : null;
+}
+
+const CARGOS = ["Ajudante de Depósito", "Conferente", "Encarregado", "ADM"];
+const CARGO_PADRAO = "Ajudante de Depósito";
+
+let cargoAtual = CARGO_PADRAO;
+let souAdmin = false;
+let mapaCargos = {};       // usuario -> cargo (para mostrar na lista de online)
+let listaPresencaAtual = []; // usuários online no momento
+
+const STATUS_OPCOES = [
+  "AGUARDANDO IMPRESSÃO",
+  "PENDENTE DE ETIQUETAGEM",
+  "EM PROCESSO DE ETIQUETAGEM",
+  "PARCIALMENTE ETIQUETADA",
+  "CARGA ETIQUETADA",
+  "PARCIALMENTE DISTRIBUIDA",
+  "EM CONFERÊNCIA"
+];
+const COLUNAS = ["produtivo","doca","carga","fornecedor","liberacao","hora","d1","volume","sku","departamento","status","obs"];
+const RENOMEAR_COLUNAS = {produtivo:"Produtivo", doca:"Doca", carga:"Carga", fornecedor:"Fornecedor", liberacao:"Liberação", hora:"Hora", d1:"D-1", volume:"Volume", sku:"SKU", departamento:"Departamento", status:"Status", obs:"Obs."};
+
+let db = null;
+let usuarioAtual = null;
+let celulaEmEdicao = null; // evita sobrescrever o que a pessoa está digitando
+let firebaseOk = false;
+
+/* ---------------------- ESTADO: DISTRIBUIÇÃO ---------------------- */
+let linhasCargasAtual = [];   // última leitura das cargas (para seleção, grade e exportação)
+let turnoSelecionado = "T2";
+let configTurnoAtual = { qtdProdutivos:"", estocadoFull:"", estocadoMix:"" };
+let unsubConfigTurno = null;
+let relogioGradeIniciado = false;
+let unsubPendencias = null;
+let pendenciasAtual = null; // último documento de pendências lido do Firestore
+let primeiraCargaSnapshot = true; // evita notificação de distribuição ao carregar a página
+let primeiraPendSnapshot = true; // evita notificação de pendência tratada ao carregar a página
+
+function iniciarFirebase(){
+  try{
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    firebaseOk = true;
+  }catch(e){
+    console.error("Firebase não configurado:", e);
+    firebaseOk = false;
+  }
+}
+iniciarFirebase();
+
+/* ---------------------- DATA / CABEÇALHO ---------------------- */
+function formatarDataHoje(){
+  const hoje = new Date();
+  const dias = ["domingo","segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado"];
+  const dd = String(hoje.getDate()).padStart(2,"0");
+  const mm = String(hoje.getMonth()+1).padStart(2,"0");
+  const yyyy = hoje.getFullYear();
+  return {
+    curta: `${dd}/${mm}/${yyyy}`,
+    extensa: `${dias[hoje.getDay()]}, ${hoje.getDate()} de ${["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"][hoje.getMonth()]} de ${yyyy}`
+  };
+}
+function preencherData(){
+  const d = formatarDataHoje();
+  document.getElementById("sub-data").textContent = d.extensa;
+  document.getElementById("r-data").textContent = d.curta;
+}
+
+/* ---------------------- LOGIN ---------------------- */
+document.getElementById("btn-entrar").addEventListener("click", tentarEntrar);
+document.getElementById("in-senha").addEventListener("keydown", e=>{ if(e.key==="Enter") tentarEntrar(); });
+
+function tentarEntrar(){
+  const usuario = document.getElementById("in-usuario").value.trim();
+  const senha = document.getElementById("in-senha").value;
+  const senhaCargoDigitada = document.getElementById("in-senha-cargo").value;
+  const erro = document.getElementById("erro-login");
+  if(!usuario){ erro.textContent = "Digite seu nome de usuário."; return; }
+  if(senha !== SENHA_CORRETA){ erro.textContent = "Senha incorreta."; return; }
+  erro.textContent = "";
+  pedirPermissaoNotificacao(); // pedido feito dentro do clique do usuário (gesto)
+  usuarioAtual = usuario;
+  const cargoSolicitado = cargoPelaSenha(senhaCargoDigitada); // null, "ADM", "Encarregado" ou "Conferente"
+  sessionStorage.setItem("cargasPiso_usuario", usuario);
+  sessionStorage.setItem("cargasPiso_cargoSolicitado", cargoSolicitado || "");
+  entrarNoPainel(cargoSolicitado);
+}
+
+async function entrarNoPainel(cargoSolicitado){
+  document.getElementById("tela-login").style.display = "none";
+  document.getElementById("tela-painel").style.display = "block";
+  document.getElementById("btn-chat-fab").classList.add("visivel");
+  preencherData();
+  if(firebaseOk){
+    await prepararCargoUsuario(cargoSolicitado || null);
+    atualizarExibicaoCargo();
+    registrarPresenca();
+    escutarPresenca();
+    escutarUsuarios();
+    escutarCargas();
+    escutarConfigTurno();
+    escutarMeuUsuario();
+    escutarPendencias();
+    escutarComentarios();
+  }else{
+    document.getElementById("aviso-sync").textContent = "⚠ Firebase não configurado — abra o código e cole o firebaseConfig do seu projeto.";
+  }
+}
+
+// Fica de olho no PRÓPRIO registro em "usuarios". Se um ADM remover esse
+// usuário do servidor, o documento deixa de existir e este cliente é
+// desconectado na hora — mesmo que a pessoa continue com a aba aberta.
+let jaEntrouComoUsuarioValido = false;
+function escutarMeuUsuario(){
+  db.collection("usuarios").doc(usuarioAtual).onSnapshot(doc=>{
+    if(doc.exists){
+      jaEntrouComoUsuarioValido = true;
+      return;
+    }
+    if(!jaEntrouComoUsuarioValido) return; // ainda não confirmou a criação inicial, ignora
+    db.collection("presenca").doc(usuarioAtual).delete().catch(()=>{});
+    sessionStorage.removeItem("cargasPiso_usuario");
+    sessionStorage.removeItem("cargasPiso_cargoSolicitado");
+    alert("Você foi removido do painel por um administrador.");
+    location.reload();
+  });
+}
+
+// Cria o registro do usuário na primeira vez que ele entra (cargo padrão:
+// Ajudante de Depósito). Se uma senha de cargo válida foi digitada,
+// promove (ou reassume) esse usuário para o cargo correspondente.
+async function prepararCargoUsuario(cargoSolicitado){
+  const ref = db.collection("usuarios").doc(usuarioAtual);
+  const doc = await ref.get();
+  if(!doc.exists){
+    cargoAtual = cargoSolicitado || CARGO_PADRAO;
+    await ref.set({ nome: usuarioAtual, cargo: cargoAtual, atualizadoPor: cargoSolicitado ? usuarioAtual : "sistema", atualizadoEm: Date.now() });
+  }else{
+    cargoAtual = doc.data().cargo || CARGO_PADRAO;
+    if(cargoSolicitado && cargoAtual !== cargoSolicitado){
+      cargoAtual = cargoSolicitado;
+      await ref.update({ cargo: cargoSolicitado, atualizadoPor: usuarioAtual, atualizadoEm: Date.now() });
+    }
+  }
+  souAdmin = (cargoAtual === "ADM");
+}
+
+// Só ADM e Encarregado podem adicionar carga direto na Grade de
+// Distribuição (sem passar pela lista de "Cargas no Piso").
+function podeAdicionarNaGrade(){
+  return ["ADM", "Encarregado"].includes(cargoAtual);
+}
+
+function atualizarExibicaoCargo(){
+  const info = document.getElementById("meu-cargo");
+  if(info) info.textContent = `${usuarioAtual} · ${cargoAtual}`;
+  const btn = document.getElementById("btn-gerenciar-usuarios");
+  if(btn) btn.style.display = souAdmin ? "inline-block" : "none";
+  const btnZerar = document.getElementById("btn-zerar-dia");
+  if(btnZerar) btnZerar.style.display = souAdmin ? "inline-block" : "none";
+  const btnGradeAdd = document.getElementById("btn-grade-add-carga");
+  if(btnGradeAdd) btnGradeAdd.style.display = podeAdicionarNaGrade() ? "inline-block" : "none";
+  const btnPendColar = document.getElementById("btn-pend-abrir-colar");
+  if(btnPendColar) btnPendColar.style.display = podeDistribuir() ? "inline-block" : "none";
+  // Salvar/imprimir (window.print, que permite "Salvar como PDF") só para
+  // Conferente, Encarregado e ADM — Ajudante de Depósito não vê os botões.
+  const btnImprimir = document.getElementById("btn-imprimir");
+  if(btnImprimir) btnImprimir.style.display = podeDistribuir() ? "inline-block" : "none";
+  const btnGradeImprimir = document.getElementById("btn-grade-imprimir");
+  if(btnGradeImprimir) btnGradeImprimir.style.display = podeDistribuir() ? "inline-block" : "none";
+  const btnPendImprimir = document.getElementById("btn-pend-imprimir");
+  if(btnPendImprimir) btnPendImprimir.style.display = podeDistribuir() ? "inline-block" : "none";
+  atualizarAvisoPermissaoPend();
+}
+
+document.getElementById("btn-sair").addEventListener("click", ()=>{
+  if(firebaseOk && usuarioAtual) db.collection("presenca").doc(usuarioAtual).delete().catch(()=>{});
+  sessionStorage.removeItem("cargasPiso_usuario");
+  sessionStorage.removeItem("cargasPiso_cargoSolicitado");
+  location.reload();
+});
+
+// retomar sessão se a página for recarregada
+window.addEventListener("load", ()=>{
+  const salvo = sessionStorage.getItem("cargasPiso_usuario");
+  if(salvo){
+    usuarioAtual = salvo;
+    pedirPermissaoNotificacao();
+    const cargoSolicitado = sessionStorage.getItem("cargasPiso_cargoSolicitado") || null;
+    entrarNoPainel(cargoSolicitado);
+  }
+});
+
+/* ---------------------- PRESENÇA (quem está online) ---------------------- */
+function registrarPresenca(){
+  const ref = db.collection("presenca").doc(usuarioAtual);
+  const atualizar = ()=> ref.set({ usuario: usuarioAtual, ultimaVez: Date.now() });
+  atualizar();
+  setInterval(atualizar, 15000); // heartbeat a cada 15s
+  window.addEventListener("beforeunload", ()=>{ ref.delete(); });
+}
+
+function escutarPresenca(){
+  db.collection("presenca").onSnapshot(snap=>{
+    const agora = Date.now();
+    const ativos = [];
+    const inativos = []; // docs de presença já vencidos: removidos automaticamente do servidor
+    snap.forEach(doc=>{
+      const d = doc.data();
+      if(agora - d.ultimaVez < 35000) ativos.push(d.usuario); // ativo nos últimos 35s
+      else inativos.push(doc.ref);
+    });
+    listaPresencaAtual = ativos;
+    renderizarOnline();
+
+    // Sempre que alguém não estiver mais online (heartbeat vencido),
+    // o registro de presença dele é apagado automaticamente do servidor.
+    if(inativos.length){
+      const lote = db.batch();
+      inativos.forEach(ref=> lote.delete(ref));
+      lote.commit().catch(()=>{});
+    }
+  });
+}
+
+function renderizarOnline(){
+  const cont = document.getElementById("lista-online");
+  cont.innerHTML = listaPresencaAtual.map(u=>{
+    const cargo = mapaCargos[u] || CARGO_PADRAO;
+    return `<span class="online-tag"><span class="ponto-verde"></span>${escapeHtml(u)}<span style="opacity:.6;"> · ${escapeHtml(cargo)}</span></span>`;
+  }).join("");
+  if(souAdmin) renderizarListaAdmin(Object.keys(mapaCargos).map(u=> ({usuario:u, cargo:mapaCargos[u]})));
+}
+
+/* ---------------------- USUÁRIOS E CARGOS ---------------------- */
+function escutarUsuarios(){
+  db.collection("usuarios").onSnapshot(snap=>{
+    mapaCargos = {};
+    snap.forEach(doc=>{
+      const d = doc.data();
+      mapaCargos[doc.id] = d.cargo || CARGO_PADRAO;
+    });
+    renderizarOnline(); // já atualiza a lista online e, se ADM, a lista de gerenciamento
+  });
+}
+
+function renderizarListaAdmin(linhas){
+  const cont = document.getElementById("lista-usuarios-admin");
+  cont.innerHTML = "";
+  linhas.sort((a,b)=> a.usuario.localeCompare(b.usuario)).forEach(item=>{
+    const online = listaPresencaAtual.includes(item.usuario);
+
+    const linha = document.createElement("div");
+    linha.style.cssText = "display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--linha);gap:10px;flex-wrap:wrap;";
+
+    const nomeWrap = document.createElement("span");
+    nomeWrap.style.cssText = "display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:13px;";
+    nomeWrap.innerHTML = `<span style="width:7px;height:7px;border-radius:50%;flex:0 0 auto;background:${online ? "#3fd47a" : "#5a6068"};${online ? "box-shadow:0 0 6px #3fd47a;" : ""}"></span>${escapeHtml(item.usuario)}`;
+
+    const acoes = document.createElement("span");
+    acoes.style.cssText = "display:flex;align-items:center;gap:8px;";
+
+    const sel = document.createElement("select");
+    sel.style.cssText = "background:var(--asfalto-2);border:1px solid var(--linha);color:var(--texto);padding:6px 8px;font-size:12.5px;";
+    CARGOS.forEach(c=>{
+      const o = document.createElement("option");
+      o.value = c; o.textContent = c;
+      if(c === item.cargo) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener("change", ()=>{
+      db.collection("usuarios").doc(item.usuario).update({
+        cargo: sel.value, atualizadoPor: usuarioAtual, atualizadoEm: Date.now()
+      });
+      if(item.usuario === usuarioAtual){ cargoAtual = sel.value; souAdmin = (cargoAtual==="ADM"); atualizarExibicaoCargo(); }
+    });
+
+    const btnRemover = document.createElement("button");
+    btnRemover.className = "botao";
+    btnRemover.textContent = "Remover";
+    btnRemover.style.cssText = "border-color:var(--pendente);color:var(--pendente);padding:6px 10px;font-size:11px;";
+    btnRemover.title = "Remove este usuário do servidor (cargo e presença)";
+    btnRemover.addEventListener("click", async ()=>{
+      if(!confirm(`Remover "${item.usuario}" do servidor? Ele(a) perde o cargo salvo e, se estiver online, é desconectado(a) do painel.`)) return;
+      try{
+        await Promise.all([
+          db.collection("usuarios").doc(item.usuario).delete(),
+          db.collection("presenca").doc(item.usuario).delete()
+        ]);
+      }catch(err){
+        console.error(err);
+        alert("Erro ao remover usuário: " + err.message);
+      }
+    });
+
+    acoes.appendChild(sel);
+    acoes.appendChild(btnRemover);
+    linha.appendChild(nomeWrap);
+    linha.appendChild(acoes);
+    cont.appendChild(linha);
+  });
+}
+
+document.getElementById("btn-gerenciar-usuarios").addEventListener("click", ()=> document.getElementById("modal-usuarios").classList.add("aberto"));
+document.getElementById("btn-fechar-usuarios").addEventListener("click", ()=> document.getElementById("modal-usuarios").classList.remove("aberto"));
+document.getElementById("modal-usuarios").addEventListener("click", e=>{
+  if(e.target.id === "modal-usuarios") e.target.classList.remove("aberto");
+});
+
+/* ---------------------- CARGAS (tabela em tempo real) ---------------------- */
+const DADOS_INICIAIS = [
+  {produtivo:"LUCAS", doca:"", carga:"435827", fornecedor:"PROCTER ID:8433", liberacao:"28/08/2026", hora:"09:46", d1:"0", volume:"6630", sku:"84", departamento:"NÃO ALIMENTOS - HLP", status:"CARGA ETIQUETADA", obs:""},
+  {produtivo:"CRISTIAN", doca:"", carga:"436014", fornecedor:"CABRAL & SOUSA ID:8675", liberacao:"28/08/2026", hora:"10:45", d1:"0", volume:"68", sku:"5", departamento:"-", status:"CARGA ETIQUETADA", obs:""},
+  {produtivo:"", doca:"", carga:"434903", fornecedor:"2º MONDELEZ ID:8373 (DROP)", liberacao:"28/08/2026", hora:"14:02", d1:"0", volume:"3020", sku:"28", departamento:"", status:"PENDENTE DE ETIQUETAGEM", obs:"Cross & Estocado: 212151"},
+  {produtivo:"CRISTIAN", doca:"22", carga:"435929", fornecedor:"C.I.C.P ID:8332", liberacao:"28/08/2026", hora:"14:58", d1:"0", volume:"1200", sku:"1", departamento:"", status:"CARGA ETIQUETADA", obs:""},
+  {produtivo:"LUCAS", doca:"5", carga:"436948", fornecedor:"ALPARGATAS ID 8487/8488", liberacao:"28/08/2026", hora:"16:26", d1:"0", volume:"699", sku:"12", departamento:"", status:"EM PROCESSO DE ETIQUETAGEM", obs:"Cross & Estocado: 212213"},
+  {produtivo:"LUCAS", doca:"5", carga:"437171", fornecedor:"1ºPEPSICO ID:8643", liberacao:"28/08/2026", hora:"18:11", d1:"0", volume:"2486", sku:"2", departamento:"", status:"CARGA ETIQUETADA", obs:""}
+];
+
+let jaTentouSemear = false;
+async function semearSeVazio(){
+  if(jaTentouSemear) return;
+  jaTentouSemear = true;
+  try{
+    const snap = await db.collection("cargas").get();
+    if(snap.empty){
+      const lote = db.batch();
+      DADOS_INICIAIS.forEach((linha,i)=>{
+        const ref = db.collection("cargas").doc();
+        lote.set(ref, {...linha, ordem:i});
+      });
+      await lote.commit();
+    }
+  }catch(e){
+    console.error("Não foi possível semear os dados iniciais:", e);
+  }
+}
+
+function escutarCargas(){
+  // Registra o listener em tempo real IMEDIATAMENTE — não espera nenhuma
+  // outra chamada terminar. Assim, se algo travar na semeadura, a tabela
+  // e o aviso de status continuam respondendo normalmente.
+  const avisoEl = document.getElementById("aviso-sync");
+  const timeoutAlerta = setTimeout(()=>{
+    avisoEl.textContent = "⚠ demorando para conectar — confira se o Firestore Database foi criado no console do Firebase";
+  }, 8000);
+
+  db.collection("cargas").orderBy("ordem").onSnapshot(snap=>{
+    clearTimeout(timeoutAlerta);
+
+    // Notifica quando uma carga é marcada como distribuída (por qualquer
+    // usuário conectado). Compara com o estado anterior (linhasCargasAtual)
+    // ANTES de renderizarTabela() sobrescrevê-lo. Não dispara na primeira
+    // carga da página (primeiraCargaSnapshot) nem ao desmarcar.
+    if(!primeiraCargaSnapshot){
+      snap.docChanges().forEach(change=>{
+        const depois = change.doc.data();
+        if(change.type === "modified"){
+          const antes = linhasCargasAtual.find(l=> l.id === change.doc.id);
+          if(antes && !antes.distribuido && depois.distribuido){
+            notificarEvento(
+              `${depois.marcadoPor || "—"} distribuiu a carga ${depois.carga || "—"}`,
+              depois.fornecedor || "",
+              "distribuida"
+            );
+          }
+        } else if(change.type === "added" && depois.distribuido){
+          // Carga criada já distribuída (ex.: "+ Adicionar direto na Grade")
+          notificarEvento(
+            `${depois.marcadoPor || "—"} distribuiu a carga ${depois.carga || "—"}`,
+            depois.fornecedor || "",
+            "distribuida"
+          );
+        }
+      });
+    }
+
+    const linhas = [];
+    snap.forEach(doc=> linhas.push({id:doc.id, ...doc.data()}));
+    renderizarTabela(linhas);
+    avisoEl.textContent = "● sincronizado em tempo real";
+    avisoEl.classList.add("ativo");
+    if(linhas.length === 0) semearSeVazio();
+    primeiraCargaSnapshot = false;
+  }, err=>{
+    clearTimeout(timeoutAlerta);
+    avisoEl.textContent = "⚠ erro de sincronização: " + err.message;
+    console.error(err);
+  });
+}
+
+function classeStatus(status){
+  if(status === "AGUARDANDO IMPRESSÃO") return "status-aguardando";
+  if(status === "PENDENTE DE ETIQUETAGEM") return "status-pendente";
+  if(status === "EM PROCESSO DE ETIQUETAGEM") return "status-processo";
+  if(status === "PARCIALMENTE ETIQUETADA") return "status-parcial";
+  if(status === "CARGA ETIQUETADA") return "status-etiquetada";
+  if(status === "PARCIALMENTE DISTRIBUIDA") return "status-parcial-dist";
+  if(status === "EM CONFERÊNCIA") return "status-conferencia";
+  return "";
+}
+
+function renderizarTabela(linhas){
+  linhasCargasAtual = linhas; // mantém todas (inclusive já distribuídas) para a grade de distribuição
+  const linhasPiso = linhas.filter(l=> !l.distribuido); // carga distribuída sai da lista de "Cargas no Piso"
+  const corpo = document.getElementById("corpo-tabela");
+  corpo.innerHTML = "";
+
+  let totalVolume = 0, totalSku = 0, totalEtiquetadas = 0;
+
+  linhasPiso.forEach(linha=>{
+    totalVolume += Number(linha.volume) || 0;
+    totalSku += Number(linha.sku) || 0;
+    if(linha.status === "CARGA ETIQUETADA") totalEtiquetadas++;
+
+    const tr = document.createElement("tr");
+    tr.dataset.id = linha.id;
+
+    COLUNAS.forEach(col=>{
+      const td = document.createElement("td");
+      td.setAttribute("data-label", RENOMEAR_COLUNAS[col]);
+      if(col === "status"){
+        td.className = classeStatus(linha.status);
+        const sel = document.createElement("select");
+        sel.className = "cel";
+        STATUS_OPCOES.forEach(op=>{
+          const o = document.createElement("option");
+          o.value = op; o.textContent = op;
+          if(op === linha.status) o.selected = true;
+          sel.appendChild(o);
+        });
+        sel.addEventListener("change", ()=> salvarCampo(linha.id, "status", sel.value));
+        td.appendChild(sel);
+      } else {
+        if(col === "volume" || col === "sku" || col === "d1") td.className = "col-num";
+        const inp = document.createElement("input");
+        inp.className = "cel";
+        inp.value = linha[col] || "";
+        inp.addEventListener("focus", ()=> celulaEmEdicao = linha.id+"-"+col);
+        inp.addEventListener("blur", ()=>{ celulaEmEdicao = null; salvarCampo(linha.id, col, inp.value); });
+        inp.addEventListener("keydown", e=>{ if(e.key==="Enter") inp.blur(); });
+        inp.addEventListener("paste", e=> tratarColagem(e, linha.id, col, linhasPiso));
+        td.appendChild(inp);
+      }
+      tr.appendChild(td);
+    });
+
+    const tdRem = document.createElement("td");
+    tdRem.className = "col-remover";
+    tdRem.setAttribute("data-label", "Remover");
+    tdRem.innerHTML = `<button class="btn-remover" title="Remover carga">✕</button>`;
+    tdRem.querySelector("button").addEventListener("click", ()=> removerLinha(linha.id));
+    tr.appendChild(tdRem);
+
+    corpo.appendChild(tr);
+  });
+
+  document.getElementById("r-total-cargas").textContent = linhasPiso.length;
+  document.getElementById("r-etiquetadas").textContent = totalEtiquetadas;
+  document.getElementById("r-volumes").textContent = totalVolume.toLocaleString("pt-BR");
+  document.getElementById("r-sku").textContent = totalSku.toLocaleString("pt-BR");
+  document.getElementById("f-volume").textContent = totalVolume.toLocaleString("pt-BR");
+  document.getElementById("f-sku").textContent = totalSku.toLocaleString("pt-BR");
+
+  renderizarSelecaoDistribuicao(linhas);
+  renderizarGradeDistribuicao(linhas);
+}
+
+function salvarCampo(id, campo, valor){
+  if(!firebaseOk) return;
+  db.collection("cargas").doc(id).update({[campo]: valor}).catch(err=>console.error(err));
+}
+
+function removerLinha(id){
+  if(!confirm("Remover esta carga do painel?")) return;
+  db.collection("cargas").doc(id).delete();
+}
+
+document.getElementById("btn-add-linha").addEventListener("click", async ()=>{
+  const snap = await db.collection("cargas").orderBy("ordem","desc").limit(1).get();
+  const proximaOrdem = snap.empty ? 0 : (snap.docs[0].data().ordem||0) + 1;
+  const nova = {ordem: proximaOrdem};
+  COLUNAS.forEach(c=> nova[c] = c==="status" ? "PENDENTE DE ETIQUETAGEM" : "");
+  db.collection("cargas").add(nova);
+});
+
+/* ---------------------- COLAR DADOS DO EXCEL ---------------------- */
+// Cola um bloco de células copiado do Excel a partir da célula focada,
+// distribuindo por colunas (tab) e linhas (quebra de linha), criando
+// linhas novas no Firestore quando necessário.
+async function tratarColagem(e, idLinhaInicial, colInicial, linhasAtuais){
+  const texto = (e.clipboardData || window.clipboardData).getData("text");
+  if(!texto || !texto.includes("\t") && !texto.includes("\n")) return; // colagem simples de 1 célula: deixa o comportamento padrão
+  e.preventDefault();
+
+  const linhasColadas = texto.replace(/\r/g,"").split("\n").filter(l=>l.length>0).map(l=>l.split("\t"));
+  const idxColInicial = COLUNAS.indexOf(colInicial);
+  const idxLinhaInicial = linhasAtuais.findIndex(l=>l.id===idLinhaInicial);
+
+  let proximaOrdem = Math.max(-1, ...linhasAtuais.map(l=>l.ordem||0)) + 1;
+  const lote = db.batch();
+
+  for(let i=0;i<linhasColadas.length;i++){
+    const linhaDestinoIdx = idxLinhaInicial + i;
+    const valores = linhasColadas[i];
+    let refDestino;
+    let dadosExistentes = {};
+
+    if(linhaDestinoIdx < linhasAtuais.length){
+      refDestino = db.collection("cargas").doc(linhasAtuais[linhaDestinoIdx].id);
+      dadosExistentes = linhasAtuais[linhaDestinoIdx];
+    } else {
+      refDestino = db.collection("cargas").doc();
+      dadosExistentes = {ordem: proximaOrdem++};
+      COLUNAS.forEach(c=> dadosExistentes[c] = dadosExistentes[c] || "");
+    }
+
+    const atualizacao = {};
+    for(let j=0;j<valores.length;j++){
+      const idxCol = idxColInicial + j;
+      if(idxCol < COLUNAS.length) atualizacao[COLUNAS[idxCol]] = valores[j].trim();
+    }
+    lote.set(refDestino, {...dadosExistentes, ...atualizacao}, {merge:true});
+  }
+  await lote.commit();
+}
+
+/* ---------------------- MODAL: COLAR PLANILHA INTEIRA ---------------------- */
+const modalColar = document.getElementById("modal-colar");
+document.getElementById("btn-abrir-colar").addEventListener("click", ()=>{
+  document.getElementById("area-colar").value = "";
+  modalColar.classList.add("aberto");
+});
+document.getElementById("btn-cancelar-colar").addEventListener("click", ()=> modalColar.classList.remove("aberto"));
+modalColar.addEventListener("click", e=>{ if(e.target === modalColar) modalColar.classList.remove("aberto"); });
+
+// Se a origem não enviar a tabulação de colunas vazias no início da linha
+// (comum quando Produtivo e/ou Doca estão em branco), a linha inteira
+// desliza para a esquerda. Aqui usamos a data (LIBERAÇÃO, formato
+// dd/mm/aaaa) ou a hora (formato hh:mm) como "âncora" para descobrir o
+// deslocamento real e recolocar cada valor na coluna certa.
+function alinharColunas(valores){
+  if(valores.length === COLUNAS.length) return valores;
+
+  const idxLiberacaoEsperado = COLUNAS.indexOf("liberacao");
+  const idxHoraEsperado = COLUNAS.indexOf("hora");
+  const padraoData = /^\d{2}\/\d{2}\/\d{4}$/;
+  const padraoHora = /^\d{1,2}:\d{2}(:\d{2})?$/;
+
+  let idxEncontrado = -1, idxEsperado = -1;
+  for(let i=0;i<valores.length;i++){
+    if(padraoData.test((valores[i]||"").trim())){ idxEncontrado=i; idxEsperado=idxLiberacaoEsperado; break; }
+  }
+  if(idxEncontrado===-1){
+    for(let i=0;i<valores.length;i++){
+      if(padraoHora.test((valores[i]||"").trim())){ idxEncontrado=i; idxEsperado=idxHoraEsperado; break; }
+    }
+  }
+  if(idxEncontrado===-1) return valores; // não achou nenhuma âncora, mantém como veio
+
+  const deslocamento = idxEsperado - idxEncontrado;
+  if(deslocamento === 0) return valores;
+
+  const alinhado = new Array(COLUNAS.length).fill("");
+  for(let i=0;i<valores.length;i++){
+    const novoIdx = i + deslocamento;
+    if(novoIdx>=0 && novoIdx<COLUNAS.length) alinhado[novoIdx] = valores[i];
+  }
+  return alinhado;
+}
+
+function textoParaLinhas(texto){
+  return texto.replace(/\r/g,"").split("\n")
+    .map(l=>l.trim())
+    .filter(l=>l.length>0)
+    .map(linha=>{
+      const valores = alinharColunas(linha.split("\t"));
+      const obj = {};
+      COLUNAS.forEach((col,i)=> obj[col] = (valores[i]||"").trim());
+      return obj;
+    });
+}
+
+document.getElementById("btn-adicionar-colar").addEventListener("click", async ()=>{
+  const linhasNovas = textoParaLinhas(document.getElementById("area-colar").value);
+  if(linhasNovas.length===0){ modalColar.classList.remove("aberto"); return; }
+  const snapAtual = await db.collection("cargas").orderBy("ordem","desc").limit(1).get();
+  let proximaOrdem = snapAtual.empty ? 0 : (snapAtual.docs[0].data().ordem||0)+1;
+  const lote = db.batch();
+  linhasNovas.forEach(linha=>{
+    const ref = db.collection("cargas").doc();
+    lote.set(ref, {...linha, ordem: proximaOrdem++});
+  });
+  await lote.commit();
+  modalColar.classList.remove("aberto");
+});
+
+document.getElementById("btn-substituir-colar").addEventListener("click", async ()=>{
+  const linhasNovas = textoParaLinhas(document.getElementById("area-colar").value);
+  if(linhasNovas.length===0){ modalColar.classList.remove("aberto"); return; }
+  if(!confirm(`Isso vai atualizar a tabela com ${linhasNovas.length} carga(s) do relatório colado. Cargas já marcadas como DISTRIBUÍDA que não estiverem nesse relatório novo serão mantidas (não somem). Continuar?`)) return;
+
+  // Identifica cada carga existente pelo número da carga, para não perder
+  // a marcação de distribuída quando o relatório for atualizado.
+  const snapExistentes = await db.collection("cargas").get();
+  const existentesPorCarga = new Map(); // chave = nº da carga -> {id, data}
+  snapExistentes.forEach(doc=>{
+    const data = doc.data();
+    const chave = (data.carga||"").trim();
+    if(chave) existentesPorCarga.set(chave, {id:doc.id, data});
+  });
+
+  const lote = db.batch();
+  const chavesUsadas = new Set();
+  let ordem = 0;
+
+  linhasNovas.forEach(linha=>{
+    const chave = (linha.carga||"").trim();
+    const existente = chave ? existentesPorCarga.get(chave) : null;
+    if(existente){
+      chavesUsadas.add(chave);
+      // mantém os dados de distribuição já gravados para essa carga
+      const preservado = {
+        distribuido: existente.data.distribuido || false,
+        turnoDist: existente.data.turnoDist || "",
+        horaDist: existente.data.horaDist || "",
+        marcadoPor: existente.data.marcadoPor || ""
+      };
+      lote.set(db.collection("cargas").doc(existente.id), {...linha, ...preservado, ordem: ordem++});
+    } else {
+      lote.set(db.collection("cargas").doc(), {...linha, ordem: ordem++});
+    }
+  });
+
+  // Cargas que não vieram no novo relatório: se já estavam distribuídas,
+  // continuam no painel (no fim da lista) em vez de sumir; caso contrário
+  // são removidas por não fazerem mais parte do relatório atual.
+  existentesPorCarga.forEach((existente, chave)=>{
+    if(chavesUsadas.has(chave)) return;
+    if(existente.data.distribuido){
+      lote.set(db.collection("cargas").doc(existente.id), {...existente.data, ordem: ordem++});
+    } else {
+      lote.delete(db.collection("cargas").doc(existente.id));
+    }
+  });
+
+  await lote.commit();
+  modalColar.classList.remove("aberto");
+});
+
+/* =====================================================================
+   PENDÊNCIAS AGRUPAMENTO CROSS — colar planilha e renderizar tabela
+   ===================================================================== */
+
+function atualizarAvisoPermissaoPend(){
+  const el = document.getElementById("aviso-permissao-pend");
+  if(!el) return;
+  el.textContent = podeDistribuir()
+    ? ""
+    : `Apenas Conferente, Encarregado ou ADM podem colar/atualizar a planilha de pendências. Seu cargo atual: ${cargoAtual}.`;
+}
+
+// Interpreta o bloco colado do Excel. Reconhece linhas de STATUS, TIPO
+// CARGA, data/hora e o cabeçalho de colunas (Carga, Fornecedor, Aging,
+// Vol, ..., Turno, Linha) para mapear as colunas dinamicamente — assim
+// funciona mesmo que a coluna em branco ("Coluna2") do Excel não venha,
+// ou venha em posição diferente.
+function parsearTextoPendencias(texto){
+  const linhasBrutas = texto.replace(/\r/g,"").split("\n").map(l=>l.split("\t")).filter(cel=> cel.some(v=>(v||"").trim()!==""));
+  const resultado = { titulo:"", status:"", tipoCarga:"", dataHoraTxt:"", linhas:[] };
+  const padraoHora = /^\d{1,2}:\d{2}(:\d{2})?$/;
+  let colunas = null; // nomes das colunas normalizados, na ordem em que vieram
+
+  const normalizar = s => (s||"").trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+
+  linhasBrutas.forEach(cel=>{
+    const primeira = (cel[0]||"").trim();
+    const primeiraNorm = normalizar(primeira);
+
+    if(primeiraNorm === "status"){ resultado.status = (cel[1]||"").trim(); return; }
+    if(primeiraNorm === "tipo carga"){ resultado.tipoCarga = (cel[1]||"").trim(); return; }
+    if(padraoHora.test(primeira)){ resultado.dataHoraTxt = `${primeira}  ${(cel[1]||"").trim()}`; return; }
+    if(primeiraNorm === "carga"){
+      colunas = cel.map(normalizar);
+      return;
+    }
+    if(primeiraNorm.startsWith("pendencias") || primeiraNorm.startsWith("pendências")){
+      resultado.titulo = primeira;
+      return;
+    }
+    if(primeira === ""){ return; }
+
+    // Linha de dados. Se já vimos o cabeçalho, mapeia por posição/nome;
+    // senão, usa a ordem padrão conhecida da planilha de origem.
+    let obj = {};
+    if(colunas){
+      colunas.forEach((nomeCol, i)=>{
+        const v = (cel[i]||"").trim();
+        if(nomeCol==="carga") obj.carga = v;
+        else if(nomeCol==="fornecedor") obj.fornecedor = v;
+        else if(nomeCol==="aging") obj.aging = v;
+        else if(nomeCol==="vol") obj.vol = v;
+        else if(nomeCol==="montada") obj.montada = v;
+        else if(nomeCol==="agrupada") obj.agrupada = v;
+        else if(nomeCol==="%") obj.percentual = v;
+        else if(nomeCol==="turno") obj.turno = v;
+        else if(nomeCol==="linha") obj.linha = v;
+      });
+    } else if(cel.length >= 10){
+      obj = { carga:cel[0], fornecedor:cel[1], aging:cel[2], vol:cel[3], montada:cel[5], agrupada:cel[6], percentual:cel[7], turno:cel[8], linha:cel[9] };
+    } else {
+      obj = { carga:cel[0], fornecedor:cel[1], aging:cel[2], vol:cel[3], montada:cel[4], agrupada:cel[5], percentual:cel[6], turno:cel[7], linha:cel[8] };
+    }
+    if((obj.carga||"").trim() !== "") resultado.linhas.push(obj);
+  });
+
+  return resultado;
+}
+
+document.getElementById("btn-pend-abrir-colar").addEventListener("click", ()=>{
+  if(!podeDistribuir()) return;
+  document.getElementById("area-pend-colar").value = "";
+  document.getElementById("modal-pend-colar").classList.add("aberto");
+});
+document.getElementById("btn-pend-cancelar-colar").addEventListener("click", ()=>{
+  document.getElementById("modal-pend-colar").classList.remove("aberto");
+});
+document.getElementById("modal-pend-colar").addEventListener("click", e=>{
+  if(e.target.id === "modal-pend-colar") e.target.classList.remove("aberto");
+});
+
+document.getElementById("btn-pend-substituir-colar").addEventListener("click", async ()=>{
+  if(!podeDistribuir() || !firebaseOk) return;
+  const texto = document.getElementById("area-pend-colar").value;
+  const dados = parsearTextoPendencias(texto);
+  if(dados.linhas.length === 0){ alert("Não encontrei nenhuma linha de dados válida no que foi colado."); return; }
+
+  try{
+    await db.collection("relatorios").doc("pendenciasCross").set({
+      ...dados,
+      atualizadoPor: usuarioAtual,
+      atualizadoEm: Date.now()
+    });
+    document.getElementById("modal-pend-colar").classList.remove("aberto");
+  }catch(err){
+    console.error(err);
+    alert("Erro ao salvar pendências: " + err.message);
+  }
+});
+
+function escutarPendencias(){
+  if(!firebaseOk) return;
+  if(unsubPendencias) unsubPendencias();
+  unsubPendencias = db.collection("relatorios").doc("pendenciasCross").onSnapshot(doc=>{
+    const novoDado = doc.exists ? doc.data() : null;
+
+    // Notifica quando uma pendência é marcada como tratada (por qualquer
+    // usuário conectado). Compara linha a linha (pela "carga") com o
+    // estado anterior, ANTES de sobrescrever pendenciasAtual. Não dispara
+    // na primeira leitura da página nem ao desmarcar.
+    if(!primeiraPendSnapshot && novoDado && Array.isArray(novoDado.linhas) &&
+       pendenciasAtual && Array.isArray(pendenciasAtual.linhas)){
+      novoDado.linhas.forEach(nova=>{
+        const antiga = pendenciasAtual.linhas.find(l=> l.carga === nova.carga);
+        if(antiga && !antiga.tratada && nova.tratada){
+          notificarEvento(
+            `${nova.tratadaPor || "—"} tratou a pendência da carga ${nova.carga || "—"}`,
+            nova.fornecedor || "",
+            "tratada"
+          );
+        }
+      });
+    }
+
+    pendenciasAtual = novoDado;
+    renderizarPendencias();
+    primeiraPendSnapshot = false;
+  });
+}
+
+// Marca (ou desmarca) uma linha de pendência de agrupamento cross como
+// tratada. Identifica a linha pelo número da carga e regrava o array
+// completo no Firestore (o documento inteiro é substituído a cada colagem
+// de planilha, então a linha não tem um id próprio).
+function marcarPendenciaTratada(cargaId, marcarComo){
+  if(!podeDistribuir() || !firebaseOk || !pendenciasAtual || !Array.isArray(pendenciasAtual.linhas)) return;
+  const linhas = pendenciasAtual.linhas.map(l=>{
+    if(l.carga !== cargaId) return l;
+    return marcarComo
+      ? {...l, tratada:true, tratadaPor: usuarioAtual, tratadaEm: Date.now()}
+      : {...l, tratada:false, tratadaPor:"", tratadaEm:""};
+  });
+  db.collection("relatorios").doc("pendenciasCross").update({linhas}).catch(err=>console.error(err));
+}
+
+function renderizarPendencias(){
+  const cabecalho = document.getElementById("pend-cabecalho");
+  const caixaTabela = document.getElementById("pend-caixa-tabela");
+  const vazio = document.getElementById("pend-vazio");
+  const corpo = document.getElementById("corpo-pend");
+
+  if(!pendenciasAtual || !Array.isArray(pendenciasAtual.linhas) || pendenciasAtual.linhas.length===0){
+    cabecalho.style.display = "none";
+    caixaTabela.style.display = "none";
+    vazio.style.display = "block";
+    return;
+  }
+  cabecalho.style.display = "flex";
+  caixaTabela.style.display = "block";
+  vazio.style.display = "none";
+
+  document.getElementById("pend-status").textContent = pendenciasAtual.status || "—";
+  document.getElementById("pend-tipo-carga").textContent = pendenciasAtual.tipoCarga || "—";
+  const dt = new Date(pendenciasAtual.atualizadoEm || Date.now());
+  const dtTxt = `${String(dt.getDate()).padStart(2,"0")}/${String(dt.getMonth()+1).padStart(2,"0")}/${dt.getFullYear()} ${String(dt.getHours()).padStart(2,"0")}:${String(dt.getMinutes()).padStart(2,"0")}`;
+  document.getElementById("pend-atualizado").textContent =
+    `Atualizado em ${dtTxt}${pendenciasAtual.atualizadoPor ? " · " + pendenciasAtual.atualizadoPor : ""}`;
+
+  corpo.innerHTML = "";
+  pendenciasAtual.linhas.forEach(l=>{
+    const pctNum = parseFloat(String(l.percentual||"").replace("%","").replace(",", "."));
+    const pctBaixo = !isNaN(pctNum) && pctNum < 95;
+    const turnoPreenchido = (l.turno||"").trim() !== "" && (l.turno||"").trim() !== "-";
+    const tratada = !!l.tratada;
+
+    const tr = document.createElement("tr");
+    tr.className = tratada ? "pend-tratada" : "";
+    tr.innerHTML = `
+      <td>${escapeHtml(l.carga||"")}</td>
+      <td class="fornecedor">${escapeHtml(l.fornecedor||"")}</td>
+      <td>${escapeHtml(l.aging||"")}</td>
+      <td>${escapeHtml(l.vol||"")}</td>
+      <td>${escapeHtml(l.montada||"")}</td>
+      <td>${escapeHtml(l.agrupada||"")}</td>
+      <td class="${pctBaixo ? "pct-baixo" : ""}">${escapeHtml(l.percentual||"")}</td>
+      <td class="${turnoPreenchido ? "turno-marcado" : ""}">${escapeHtml(l.turno||"")}</td>
+      <td>${escapeHtml(l.linha||"")}</td>
+      <td class="col-tratada"></td>
+    `;
+
+    const tdTratada = tr.querySelector(".col-tratada");
+    const btn = document.createElement("button");
+    btn.className = "circulo-dist-mini" + (tratada ? " marcado" : "");
+    btn.title = tratada ? "Desmarcar como tratada" : "Marcar como tratada";
+    btn.disabled = !podeDistribuir();
+    btn.addEventListener("click", ()=> marcarPendenciaTratada(l.carga, !tratada));
+    tdTratada.appendChild(btn);
+    if(tratada && l.tratadaPor){
+      const sp = document.createElement("span");
+      sp.className = "tratada-por";
+      sp.textContent = l.tratadaPor;
+      tdTratada.appendChild(sp);
+    }
+
+    corpo.appendChild(tr);
+  });
+}
+
+/* ---------------------- IMPRIMIR / SALVAR PDF ----------------------
+   Cada botão marca o <body> com uma classe antes de chamar window.print()
+   (que no navegador oferece "Salvar como PDF"), assim o CSS de impressão
+   mostra só a seção pedida. A classe é removida depois, no "afterprint". */
+function imprimirSecao(classe){
+  document.body.classList.add(classe);
+  const limpar = ()=>{
+    document.body.classList.remove(classe);
+    window.removeEventListener("afterprint", limpar);
+  };
+  window.addEventListener("afterprint", limpar);
+  window.print();
+  // Reforço para navegadores que não disparam "afterprint" de forma
+  // confiável (ex.: alguns celulares).
+  setTimeout(limpar, 2000);
+}
+
+document.getElementById("btn-imprimir").addEventListener("click", ()=> imprimirSecao("imprimir-so-piso"));
+document.getElementById("btn-pend-imprimir").addEventListener("click", ()=> imprimirSecao("imprimir-so-pend"));
+
+/* ---------------------- ZERAR PAINEL (NOVO DIA) ---------------------- */
+// Apaga 100% das cargas (Cargas no Piso + Distribuição) e zera a
+// configuração de todos os turnos (Qtd. Produtivos / Estocado Full /
+// Estocado Mix), como se o painel fosse começar um novo dia do zero.
+// Restrito a ADM por ser uma ação destrutiva e irreversível.
+const TURNOS_PAINEL = ["T1", "T2", "T3"];
+
+document.getElementById("btn-zerar-dia").addEventListener("click", async ()=>{
+  if(!souAdmin) return;
+  if(!confirm("Isso vai APAGAR TODAS as cargas do painel (Cargas no Piso e Distribuição) e zerar a configuração de todos os turnos (T1, T2, T3), como se fosse começar um novo dia. Essa ação não pode ser desfeita. Continuar?")) return;
+  const digitado = prompt('Para confirmar, digite ZERAR:');
+  if((digitado || "").trim().toUpperCase() !== "ZERAR"){
+    alert("Confirmação não corresponde. Nada foi apagado.");
+    return;
+  }
+
+  try{
+    const lote = db.batch();
+
+    const snapCargas = await db.collection("cargas").get();
+    snapCargas.forEach(doc=> lote.delete(doc.ref));
+
+    TURNOS_PAINEL.forEach(turno=>{
+      lote.set(db.collection("configDistribuicao").doc(turno), {
+        qtdProdutivos: 0, estocadoFull: "", estocadoMix: "",
+        atualizadoPor: usuarioAtual, atualizadoEm: Date.now()
+      });
+    });
+
+    await lote.commit();
+    alert("Painel zerado. Pronto para um novo dia.");
+  }catch(err){
+    console.error(err);
+    alert("Erro ao zerar o painel: " + err.message);
+  }
+});
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+/* =====================================================================
+   COMENTÁRIOS — chat flutuante, compartilhado entre todos os usuários
+   (Ajudante de Depósito, Conferente, Encarregado e ADM podem ler e
+   escrever; não há restrição de cargo aqui).
+   ===================================================================== */
+let comentariosVistos = 0; // quantos comentários já foram vistos, p/ o "ponto" de novo no botão
+let unsubComentarios = null;
+const COM_EXPIRA_MS = 7 * 60 * 60 * 1000; // mensagens do comunicador somem após 7h
+
+function comLabelExpira(criadoEm){
+  if(!criadoEm) return "";
+  const restam = COM_EXPIRA_MS - (Date.now() - criadoEm);
+  if(restam <= 0) return "expirando…";
+  const h = Math.floor(restam / 3600000);
+  const m = Math.floor((restam % 3600000) / 60000);
+  return h > 0 ? `some em ${h}h${m>0? m+"m":""}` : `some em ${m}m`;
+}
+
+function escutarComentarios(){
+  if(!firebaseOk) return;
+  if(unsubComentarios) unsubComentarios();
+  unsubComentarios = db.collection("comentarios").orderBy("criadoEm").limitToLast(200)
+    .onSnapshot(snap=>{
+      const agora = Date.now();
+      const lista = [];
+      const expirados = [];
+      snap.forEach(doc=>{
+        const d = doc.data();
+        if(d.criadoEm && agora - d.criadoEm >= COM_EXPIRA_MS){
+          expirados.push(doc.id);
+        }else{
+          lista.push({ id: doc.id, ...d });
+        }
+      });
+      renderizarComentarios(lista);
+      // limpeza silenciosa dos documentos que já passaram de 7h
+      expirados.forEach(id=> db.collection("comentarios").doc(id).delete().catch(()=>{}));
+    }, err=> console.error("Erro ao escutar comentários:", err));
+}
+
+function renderizarComentarios(lista){
+  const cont = document.getElementById("chat-mensagens");
+  const painel = document.getElementById("painel-chat");
+  const fab = document.getElementById("btn-chat-fab");
+  if(!cont || !painel || !fab) return;
+
+  const estaAberto = painel.classList.contains("aberto");
+  const jaEstavaNoFim = cont.scrollTop + cont.clientHeight >= cont.scrollHeight - 40;
+
+  if(lista.length === 0){
+    cont.innerHTML = '<div class="chat-vazio">Nenhuma mensagem ainda. Seja o primeiro!</div>';
+  }else{
+    cont.innerHTML = lista.map(c=>{
+      const hora = c.criadoEm ? new Date(c.criadoEm).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}) : "";
+      const minha = c.usuario === usuarioAtual;
+      return `
+        <div class="chat-msg ${minha? "minha":""}">
+          <span class="chat-expira">${comLabelExpira(c.criadoEm)}</span>
+          <span class="chat-autor">${escapeHtml(minha? "Você" : (c.usuario || "—"))}</span>
+          <span class="chat-hora">${hora}</span>
+          <div class="chat-texto">${escapeHtml(c.texto || "")}</div>
+        </div>`;
+    }).join("");
+  }
+
+  if(estaAberto){
+    comentariosVistos = lista.length;
+    if(jaEstavaNoFim) cont.scrollTop = cont.scrollHeight;
+    fab.classList.remove("tem-novo");
+  }else if(lista.length > comentariosVistos){
+    fab.classList.add("tem-novo");
+  }
+}
+
+// atualiza os rótulos de "some em Xh" mesmo sem mensagens novas chegando
+setInterval(()=>{
+  const painel = document.getElementById("painel-chat");
+  if(painel && painel.classList.contains("aberto")){
+    document.querySelectorAll("#chat-mensagens .chat-msg .chat-expira").forEach(()=>{});
+  }
+}, 60000);
+
+document.getElementById("btn-chat-fab").addEventListener("click", ()=>{
+  const painel = document.getElementById("painel-chat");
+  const abrindo = !painel.classList.contains("aberto");
+  painel.classList.toggle("aberto", abrindo);
+  if(abrindo){
+    document.getElementById("btn-chat-fab").classList.remove("tem-novo");
+    const cont = document.getElementById("chat-mensagens");
+    cont.scrollTop = cont.scrollHeight;
+    comentariosVistos = cont.querySelectorAll(".chat-msg").length;
+    document.getElementById("in-chat-texto").focus();
+  }
+});
+document.getElementById("btn-chat-fechar").addEventListener("click", ()=>{
+  document.getElementById("painel-chat").classList.remove("aberto");
+});
+document.getElementById("form-chat").addEventListener("submit", (e)=>{
+  e.preventDefault();
+  if(!firebaseOk || !usuarioAtual) return;
+  const input = document.getElementById("in-chat-texto");
+  const texto = input.value.trim();
+  if(!texto) return;
+  input.value = "";
+  db.collection("comentarios").add({ usuario: usuarioAtual, texto, criadoEm: Date.now() })
+    .catch(err=>{ console.error(err); alert("Erro ao enviar mensagem: " + err.message); });
+});
+
+/* =====================================================================
+   DISTRIBUIÇÃO — seleção de cargas e grade (T1 / T2 / T3)
+   ===================================================================== */
+
+// Só Conferente, Encarregado ou ADM podem marcar/desmarcar distribuição
+// e editar Qtd. Produtivos / Estocado Full / Estocado Mix.
+function podeDistribuir(){
+  return ["Conferente", "Encarregado", "ADM"].includes(cargoAtual);
+}
+
+function atualizarAvisoPermissao(){
+  const el = document.getElementById("aviso-permissao-dist");
+  if(!el) return;
+  el.textContent = podeDistribuir()
+    ? ""
+    : `Apenas Conferente, Encarregado ou ADM podem marcar cargas como distribuídas ou editar a grade. Seu cargo atual: ${cargoAtual}.`;
+}
+
+document.getElementById("sel-turno").addEventListener("change", e=>{
+  turnoSelecionado = e.target.value;
+  escutarConfigTurno();
+  renderizarSelecaoDistribuicao(linhasCargasAtual);
+  renderizarGradeDistribuicao(linhasCargasAtual);
+});
+
+function escutarConfigTurno(){
+  if(!firebaseOk) return;
+  if(unsubConfigTurno) unsubConfigTurno();
+  unsubConfigTurno = db.collection("configDistribuicao").doc(turnoSelecionado).onSnapshot(doc=>{
+    const d = doc.exists ? doc.data() : {};
+    configTurnoAtual = {
+      qtdProdutivos: d.qtdProdutivos ?? "",
+      estocadoFull: d.estocadoFull ?? "",
+      estocadoMix: d.estocadoMix ?? ""
+    };
+    const inProdutivos = document.getElementById("in-qtd-produtivos");
+    const inFull = document.getElementById("in-estocado-full");
+    const inMix = document.getElementById("in-estocado-mix");
+    if(document.activeElement !== inProdutivos) inProdutivos.value = configTurnoAtual.qtdProdutivos;
+    if(document.activeElement !== inFull) inFull.value = configTurnoAtual.estocadoFull;
+    if(document.activeElement !== inMix) inMix.value = configTurnoAtual.estocadoMix;
+    inProdutivos.disabled = !podeDistribuir();
+    inFull.disabled = !podeDistribuir();
+    inMix.disabled = !podeDistribuir();
+    renderizarGradeDistribuicao(linhasCargasAtual);
+  });
+}
+
+function salvarConfigTurno(campo, valor){
+  if(!firebaseOk || !podeDistribuir()) return;
+  db.collection("configDistribuicao").doc(turnoSelecionado)
+    .set({[campo]: valor, atualizadoPor: usuarioAtual, atualizadoEm: Date.now()}, {merge:true});
+}
+document.getElementById("in-qtd-produtivos").addEventListener("change", e=> salvarConfigTurno("qtdProdutivos", Number(e.target.value)||0));
+document.getElementById("in-estocado-full").addEventListener("change", e=> salvarConfigTurno("estocadoFull", e.target.value));
+document.getElementById("in-estocado-mix").addEventListener("change", e=> salvarConfigTurno("estocadoMix", e.target.value));
+
+/* ---------------------- NOTIFICAÇÕES (TOAST + SISTEMA OPERACIONAL) ---------------------- */
+// Toast dentro da página (sempre funciona) + notificação nativa do
+// sistema operacional (funciona mesmo com a aba em segundo plano ou
+// minimizada, desde que o navegador continue aberto). "tipo" controla
+// a cor da barra lateral do toast: "distribuida" (verde) ou "tratada" (azul).
+function notificarEvento(titulo, detalhe, tipo){
+  mostrarToast(titulo, detalhe, tipo);
+  mostrarNotificacaoNativa(titulo, detalhe);
+}
+
+function mostrarToast(titulo, detalhe, tipo){
+  const cont = document.getElementById("toast-container");
+  if(!cont) return;
+  const el = document.createElement("div");
+  el.className = "toast" + (tipo === "tratada" ? " tipo-tratada" : "");
+  el.innerHTML = `<b>${escapeHtml(titulo)}</b>` + (detalhe ? `<div class="toast-sub">${escapeHtml(detalhe)}</div>` : "");
+  cont.appendChild(el);
+  setTimeout(()=>{
+    el.classList.add("saindo");
+    setTimeout(()=> el.remove(), 260);
+  }, 6000);
+}
+
+// Detecta o navegador Safari (desktop e iOS). No Safari as notificações
+// nativas não funcionam de forma confiável (iOS não suporta a API fora de
+// um PWA instalado, e o desktop tem restrições próprias), então tratamos
+// o Safari sempre como "não suportado", mesmo quando a API existe.
+function ehSafari(){
+  const ua = navigator.userAgent;
+  return /^((?!chrome|android|crios|fxios|edg|opr).)*safari/i.test(ua);
+}
+
+// Pede permissão de notificação do navegador/SO. Chamada a partir do
+// clique em "Entrar" (gesto do usuário) e também ao restaurar a sessão,
+// para cobrir quem já estava logado antes dessa função existir.
+let permissaoNotifJaPedida = false;
+function pedirPermissaoNotificacao(){
+  if(ehSafari()) return;
+  if(!("Notification" in window)) return;
+  if(Notification.permission === "default" && !permissaoNotifJaPedida){
+    permissaoNotifJaPedida = true;
+    Notification.requestPermission().finally(()=> atualizarBotaoNotif());
+  }
+}
+
+// Dispara a notificação nativa do sistema operacional (aparece mesmo com
+// a aba minimizada ou em segundo plano, contanto que o navegador esteja
+// aberto). Requer permissão concedida — se negada ou ainda não decidida,
+// só o toast dentro da página é exibido.
+function mostrarNotificacaoNativa(titulo, corpo){
+  if(ehSafari()) return;
+  if(!("Notification" in window)) return;
+  if(Notification.permission !== "granted") return;
+  try{
+    const n = new Notification(titulo, {
+      body: corpo || "",
+      tag: "cargas-piso-" + Date.now(),
+      icon: "https://em-content.zobj.net/source/microsoft-teams/363/package_1f4e6.png"
+    });
+    n.onclick = ()=>{ window.focus(); n.close(); };
+  }catch(e){
+    console.error("Erro ao mostrar notificação nativa:", e);
+  }
+}
+
+// Botão de status/ativação manual das notificações — útil quando o
+// navegador bloqueou o pedido automático ou o usuário negou sem querer.
+function atualizarBotaoNotif(){
+  const btn = document.getElementById("btn-notif-status");
+  if(!btn) return;
+  if(ehSafari()){
+    btn.textContent = "🔕 Notificações não suportadas no Safari";
+    btn.disabled = true;
+    return;
+  }
+  if(!("Notification" in window)){
+    btn.textContent = "🔕 Notificações não suportadas neste navegador";
+    btn.disabled = true;
+    return;
+  }
+  if(Notification.permission === "granted"){
+    btn.textContent = "🔔 Notificações do sistema ativadas";
+    btn.disabled = true;
+  } else if(Notification.permission === "denied"){
+    btn.textContent = "🔕 Notificações bloqueadas — libere nas configurações do navegador";
+    btn.disabled = true;
+  } else {
+    btn.textContent = "🔔 Ativar notificações do sistema";
+    btn.disabled = false;
+  }
+}
+document.getElementById("btn-notif-status").addEventListener("click", ()=>{
+  if(ehSafari() || !("Notification" in window)) return;
+  Notification.requestPermission().finally(atualizarBotaoNotif);
+});
+atualizarBotaoNotif();
+
+function horaAgora(){
+  const d = new Date();
+  return String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
+}
+
+// Marca (ou desmarca) uma carga como distribuída. Ao marcar, grava o
+// turno selecionado no momento e a hora atual (HORA DIST.).
+function marcarDistribuido(id, marcarComo){
+  if(!podeDistribuir() || !firebaseOk) return;
+  const dados = marcarComo
+    ? { distribuido:true, turnoDist: turnoSelecionado, horaDist: horaAgora(), marcadoPor: usuarioAtual }
+    : { distribuido:false, turnoDist:"", horaDist:"", marcadoPor:"" };
+  db.collection("cargas").doc(id).update(dados).catch(err=>console.error(err));
+}
+
+/* ---------------------- ADICIONAR CARGA DIRETO NA GRADE ---------------------- */
+// Cria a carga já como distribuída (não passa pela lista de "Cargas no
+// Piso"), aparecendo direto na Grade de Distribuição do turno escolhido.
+const modalGradeAdd = document.getElementById("modal-grade-add");
+
+document.getElementById("btn-grade-add-carga").addEventListener("click", ()=>{
+  if(!podeAdicionarNaGrade()) return;
+  ["ga-doca","ga-carga","ga-descricao","ga-liberacao","ga-d1","ga-volume","ga-sku"].forEach(id=>{
+    document.getElementById(id).value = "";
+  });
+  document.getElementById("ga-turno").value = turnoSelecionado;
+  document.getElementById("ga-hora").value = horaAgora();
+  modalGradeAdd.classList.add("aberto");
+});
+document.getElementById("btn-grade-add-cancelar").addEventListener("click", ()=> modalGradeAdd.classList.remove("aberto"));
+modalGradeAdd.addEventListener("click", e=>{ if(e.target === modalGradeAdd) modalGradeAdd.classList.remove("aberto"); });
+
+document.getElementById("btn-grade-add-salvar").addEventListener("click", async ()=>{
+  if(!podeAdicionarNaGrade() || !firebaseOk) return;
+  const carga = document.getElementById("ga-carga").value.trim();
+  if(!carga){ alert("Preencha ao menos o número da carga."); return; }
+
+  const snap = await db.collection("cargas").orderBy("ordem","desc").limit(1).get();
+  const proximaOrdem = snap.empty ? 0 : (snap.docs[0].data().ordem||0) + 1;
+  const turnoEscolhido = document.getElementById("ga-turno").value;
+
+  const nova = { ordem: proximaOrdem };
+  COLUNAS.forEach(c=> nova[c] = c==="status" ? "CARGA ETIQUETADA" : "");
+  nova.doca = document.getElementById("ga-doca").value.trim();
+  nova.carga = carga;
+  nova.fornecedor = document.getElementById("ga-descricao").value.trim();
+  nova.liberacao = document.getElementById("ga-liberacao").value.trim();
+  nova.d1 = document.getElementById("ga-d1").value.trim();
+  nova.volume = document.getElementById("ga-volume").value.trim();
+  nova.sku = document.getElementById("ga-sku").value.trim();
+  nova.distribuido = true;
+  nova.turnoDist = turnoEscolhido;
+  nova.horaDist = document.getElementById("ga-hora").value.trim() || horaAgora();
+  nova.marcadoPor = usuarioAtual;
+
+  try{
+    await db.collection("cargas").add(nova);
+    modalGradeAdd.classList.remove("aberto");
+  }catch(err){
+    console.error(err);
+    alert("Erro ao adicionar carga na grade: " + err.message);
+  }
+});
+
+function renderizarSelecaoDistribuicao(linhas){
+  atualizarAvisoPermissao();
+  const cont = document.getElementById("corpo-selecao");
+  if(!cont) return;
+  cont.innerHTML = "";
+
+  linhas.forEach(linha=>{
+    const pronta = linha.status === "CARGA ETIQUETADA";
+    const marcado = !!linha.distribuido;
+
+    const div = document.createElement("div");
+    div.className = "linha-selecao" + (marcado ? " ja-distribuida" : "");
+    div.innerHTML = `
+      <span class="col-num campo-doca">${escapeHtml(linha.doca || "—")}</span>
+      <span class="col-num campo-carga">${escapeHtml(linha.carga || "—")}</span>
+      <span class="campo-fornecedor">${escapeHtml(linha.fornecedor || "—")}</span>
+      <span class="col-num campo-volume">${escapeHtml(linha.volume || "0")}</span>
+      <span class="col-num campo-sku">${escapeHtml(linha.sku || "0")}</span>
+      <span class="status-mini campo-status ${marcado ? "ok" : "espera"}">${
+        marcado ? "DISTRIBUÍDA · " + escapeHtml(linha.turnoDist || "") + (linha.marcadoPor ? " · " + escapeHtml(linha.marcadoPor) : "") : (pronta ? "PRONTA" : "AGUARDANDO")
+      }</span>
+    `;
+
+    const bloco = document.createElement("div");
+    bloco.className = "bloco-circulo";
+    const btn = document.createElement("button");
+    btn.className = "circulo-dist" + (marcado ? " marcado" : "");
+    btn.title = marcado ? "Desmarcar distribuição" : "Marcar como distribuída";
+    btn.disabled = !podeDistribuir() || (!pronta && !marcado);
+    btn.addEventListener("click", ()=> marcarDistribuido(linha.id, !marcado));
+    bloco.appendChild(btn);
+    if(marcado && linha.horaDist){
+      const sp = document.createElement("span");
+      sp.className = "hora-marcada";
+      sp.textContent = linha.horaDist;
+      bloco.appendChild(sp);
+    }
+    div.appendChild(bloco);
+    cont.appendChild(div);
+  });
+}
+
+// Calcula os números da grade (volume, sku, qtd cargas, H/H) para o
+// turno atualmente selecionado, a partir das cargas marcadas como
+// distribuídas naquele turno.
+function calcularResumoGrade(){
+  const turno = turnoSelecionado;
+  const distribuidas = linhasCargasAtual
+    .filter(l=> l.distribuido && l.turnoDist === turno)
+    .sort((a,b)=> (a.horaDist||"").localeCompare(b.horaDist||""));
+  const totalVolume = distribuidas.reduce((s,l)=> s + (Number(l.volume)||0), 0);
+  const totalSku = distribuidas.reduce((s,l)=> s + (Number(l.sku)||0), 0);
+  const qtdCargas = distribuidas.length;
+  const qtdProdutivos = Number(configTurnoAtual.qtdProdutivos) || 0;
+  // H/H = volume distribuído / qtd de produtivos / 7
+  const hh = qtdProdutivos > 0 ? Math.round(totalVolume / qtdProdutivos / 7) : 0;
+  return { turno, distribuidas, totalVolume, totalSku, qtdCargas, qtdProdutivos, hh };
+}
+
+function renderizarGradeDistribuicao(){
+  const { turno, distribuidas, totalVolume, totalSku, qtdCargas, qtdProdutivos, hh } = calcularResumoGrade();
+
+  document.getElementById("grade-titulo").textContent = "DISTRIBUIÇÃO " + turno;
+  document.getElementById("grade-total-turno").textContent = turno;
+  atualizarRelogioGrade();
+
+  const corpo = document.getElementById("corpo-grade");
+  corpo.innerHTML = "";
+  const totalLinhas = Math.max(5, distribuidas.length);
+
+  for(let i=0;i<totalLinhas;i++){
+    const l = distribuidas[i];
+    const tr = document.createElement("tr");
+
+    let painelA = "", painelB = "", classeA = "painel", classeB = "painel";
+    if(i===0){ painelA = qtdProdutivos || ""; painelB = qtdCargas || ""; }
+    else if(i===1){ painelA = "H/H"; painelB = "ESTOCADO FULL"; classeA += " rotulo"; classeB += " rotulo"; }
+    else if(i===2){ painelA = qtdProdutivos>0 ? hh : ""; painelB = configTurnoAtual.estocadoFull || ""; }
+    else if(i===3){ painelA = "CROSS"; painelB = "ESTOCADO MIX"; classeA += " rotulo"; classeB += " rotulo"; }
+    else if(i===4){ painelA = totalVolume ? totalVolume.toLocaleString("pt-BR") : ""; painelB = configTurnoAtual.estocadoMix || ""; }
+
+    tr.innerHTML = `
+      <td></td>
+      <td>${l ? escapeHtml(l.doca||"") : ""}</td>
+      <td>${l ? escapeHtml(l.carga||"") : ""}</td>
+      <td class="desc">${l ? escapeHtml(l.fornecedor||"") : ""}</td>
+      <td>${l ? escapeHtml(l.liberacao||"") : ""}</td>
+      <td>${l ? escapeHtml(l.d1||"") : ""}</td>
+      <td>${l ? Number(l.volume||0).toLocaleString("pt-BR") : ""}</td>
+      <td>${l ? escapeHtml(l.sku||"") : ""}</td>
+      <td class="cel-hora-dist"></td>
+      <td class="${classeA}">${escapeHtml(String(painelA))}</td>
+      <td class="${classeB}">${escapeHtml(String(painelB))}</td>
+    `;
+    corpo.appendChild(tr);
+
+    // Hora Dist. editável: Conferente, Encarregado e ADM podem corrigir o
+    // horário manualmente (ex.: quando a distribuição foi marcada com
+    // atraso). Ajudante de Depósito só vê o valor, sem poder alterar.
+    const tdHora = tr.querySelector(".cel-hora-dist");
+    if(l && podeDistribuir()){
+      const inp = document.createElement("input");
+      inp.type = "text";
+      inp.className = "cel";
+      inp.placeholder = "hh:mm";
+      inp.value = l.horaDist || "";
+      inp.addEventListener("blur", ()=> salvarCampo(l.id, "horaDist", inp.value.trim()));
+      tdHora.appendChild(inp);
+    }else{
+      tdHora.textContent = l ? (l.horaDist || "") : "";
+    }
+  }
+
+  document.getElementById("grade-total-volume").textContent = totalVolume.toLocaleString("pt-BR");
+  document.getElementById("grade-total-sku").textContent = totalSku.toLocaleString("pt-BR");
+}
+
+function formatarDataHoraAgora(){
+  const d = new Date();
+  const dd = String(d.getDate()).padStart(2,"0");
+  const mm = String(d.getMonth()+1).padStart(2,"0");
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2,"0");
+  const mi = String(d.getMinutes()).padStart(2,"0");
+  const ss = String(d.getSeconds()).padStart(2,"0");
+  return { data: `${dd}/${mm}/${yyyy}`, hora: `${hh}:${mi}:${ss}` };
+}
+
+function atualizarRelogioGrade(){
+  const el = document.getElementById("grade-data-hora");
+  if(!el) return;
+  const { data, hora } = formatarDataHoraAgora();
+  el.textContent = `${data}   ${hora}`;
+  if(!relogioGradeIniciado){
+    relogioGradeIniciado = true;
+    setInterval(()=>{
+      const e2 = document.getElementById("grade-data-hora");
+      if(!e2) return;
+      const { data:d2, hora:h2 } = formatarDataHoraAgora();
+      e2.textContent = `${d2}   ${h2}`;
+    }, 1000);
+  }
+}
+
+/* =====================================================================
+   EXPORTAÇÃO — BAIXAR HTML / BAIXAR EXCEL
+   ===================================================================== */
+function baixarArquivo(conteudo, nomeArquivo, tipoMime){
+  const blob = new Blob([conteudo], {type: tipoMime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = nomeArquivo;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ---- Tabela principal (Cargas no Piso) ---- */
+function gerarHtmlTabelaPrincipal(){
+  const d = formatarDataHoje();
+  const linhasPiso = linhasCargasAtual.filter(l=> !l.distribuido);
+  const linhasHtml = linhasPiso.map(l=>
+    "<tr>" + COLUNAS.map(c=>`<td>${escapeHtml(l[c]||"")}</td>`).join("") + "</tr>"
+  ).join("");
+  const cabecalhos = COLUNAS.map(c=>`<th>${RENOMEAR_COLUNAS[c]}</th>`).join("");
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Cargas no Piso — CD Secos</title>
+<style>
+  body{font-family:Arial,sans-serif;background:#fff;color:#000;padding:20px;}
+  h1{font-size:18px;}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;}
+  th,td{border:1px solid #444;padding:6px 8px;text-align:left;}
+  th{background:#222;color:#f4b400;text-transform:uppercase;font-size:11px;}
+</style></head><body>
+<h1>Cargas no Piso — CD Secos — ${d.curta}</h1>
+<table><thead><tr>${cabecalhos}</tr></thead><tbody>${linhasHtml}</tbody></table>
+</body></html>`;
+}
+
+document.getElementById("btn-baixar-html").addEventListener("click", ()=>{
+  const d = formatarDataHoje();
+  baixarArquivo(gerarHtmlTabelaPrincipal(), `cargas-piso_${d.curta.replace(/\//g,"-")}.html`, "text/html;charset=utf-8");
+});
+
+document.getElementById("btn-baixar-excel").addEventListener("click", ()=>{
+  const d = formatarDataHoje();
+  const linhasPiso = linhasCargasAtual.filter(l=> !l.distribuido);
+  const dados = linhasPiso.map(l=>{
+    const obj = {};
+    COLUNAS.forEach(c=> obj[RENOMEAR_COLUNAS[c]] = l[c] || "");
+    return obj;
+  });
+  const ws = XLSX.utils.json_to_sheet(dados);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Cargas");
+  XLSX.writeFile(wb, `cargas-piso_${d.curta.replace(/\//g,"-")}.xlsx`);
+});
+
+/* ---- Grade de Distribuição ---- */
+function montarLinhasGradeParaExport(){
+  const { turno, distribuidas, totalVolume, totalSku, qtdCargas, qtdProdutivos, hh } = calcularResumoGrade();
+  const totalLinhas = Math.max(5, distribuidas.length);
+  const linhas = [];
+  for(let i=0;i<totalLinhas;i++){
+    const l = distribuidas[i];
+    let painelA = "", painelB = "";
+    if(i===0){ painelA = qtdProdutivos || ""; painelB = qtdCargas || ""; }
+    else if(i===1){ painelA = "H/H"; painelB = "ESTOCADO FULL"; }
+    else if(i===2){ painelA = qtdProdutivos>0 ? hh : ""; painelB = configTurnoAtual.estocadoFull || ""; }
+    else if(i===3){ painelA = "CROSS"; painelB = "ESTOCADO MIX"; }
+    else if(i===4){ painelA = totalVolume || ""; painelB = configTurnoAtual.estocadoMix || ""; }
+    linhas.push({
+      etiquetagem:"", doca: l?l.doca:"", carga: l?l.carga:"", descricao: l?l.fornecedor:"",
+      liberacao: l?l.liberacao:"", d1: l?l.d1:"", volume: l?(Number(l.volume)||""):"",
+      sku: l?l.sku:"", horaDist: l?l.horaDist:"", qtdProdutivos: painelA, qtdCargas: painelB
+    });
+  }
+  return { linhas, totalVolume, totalSku, turno };
+}
+
+function gerarHtmlGrade(){
+  const { linhas, totalVolume, totalSku, turno } = montarLinhasGradeParaExport();
+  const { data, hora } = formatarDataHoraAgora();
+  const corpo = linhas.map(l=>`<tr>
+    <td>${escapeHtml(l.etiquetagem)}</td><td>${escapeHtml(l.doca)}</td><td>${escapeHtml(l.carga)}</td>
+    <td style="text-align:left;font-weight:600;">${escapeHtml(l.descricao)}</td><td>${escapeHtml(l.liberacao)}</td>
+    <td>${escapeHtml(l.d1)}</td><td>${l.volume ? Number(l.volume).toLocaleString("pt-BR") : ""}</td>
+    <td>${escapeHtml(l.sku)}</td><td>${escapeHtml(l.horaDist)}</td>
+    <td style="background:#c9d3e6;font-weight:700;">${escapeHtml(String(l.qtdProdutivos))}</td>
+    <td style="background:#c9d3e6;font-weight:700;">${escapeHtml(String(l.qtdCargas))}</td>
+  </tr>`).join("");
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Distribuição ${turno}</title>
+<style>
+  body{font-family:Arial,sans-serif;background:#fff;color:#000;padding:20px;}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;}
+  th,td{border:1px solid #444;padding:6px 8px;text-align:center;}
+  thead th{background:#1f2c47;color:#fff;text-transform:uppercase;font-size:11px;}
+  caption{background:#1f2c47;color:#fff;font-weight:700;text-align:left;padding:10px;text-transform:uppercase;}
+  tfoot td{background:#000;color:#fff;font-weight:700;}
+</style></head><body>
+<table>
+  <caption>DISTRIBUIÇÃO ${turno} &nbsp;&nbsp; ${data} &nbsp;&nbsp; ${hora}</caption>
+  <thead><tr><th>Etiquetagem</th><th>Doca</th><th>Carga</th><th>Descrição</th><th>Liberação</th><th>D-1</th><th>Volume</th><th>SKU</th><th>Hora Dist.</th><th>Qtd Produtivos</th><th>Qtd Cargas</th></tr></thead>
+  <tbody>${corpo}</tbody>
+  <tfoot><tr><td colspan="3" style="text-align:left;">DISTRIBUIÇÃO TOTAL ${turno}</td><td colspan="3"></td><td>${totalVolume.toLocaleString("pt-BR")}</td><td>${totalSku}</td><td colspan="3"></td></tr></tfoot>
+</table>
+</body></html>`;
+}
+
+document.getElementById("btn-grade-baixar-html").addEventListener("click", ()=>{
+  const { turno } = montarLinhasGradeParaExport();
+  baixarArquivo(gerarHtmlGrade(), `distribuicao_${turno}_${Date.now()}.html`, "text/html;charset=utf-8");
+});
+
+document.getElementById("btn-grade-baixar-excel").addEventListener("click", ()=>{
+  const { linhas, totalVolume, totalSku, turno } = montarLinhasGradeParaExport();
+  const aoa = [
+    ["DISTRIBUIÇÃO " + turno],
+    ["Etiquetagem","Doca","Carga","Descrição","Liberação","D-1","Volume","SKU","Hora Dist.","Qtd Produtivos","Qtd Cargas"]
+  ];
+  linhas.forEach(l=> aoa.push([l.etiquetagem, l.doca, l.carga, l.descricao, l.liberacao, l.d1, l.volume, l.sku, l.horaDist, l.qtdProdutivos, l.qtdCargas]));
+  aoa.push(["DISTRIBUIÇÃO TOTAL " + turno, "", "", "", "", "", totalVolume, totalSku, "", "", ""]);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Distribuição " + turno);
+  XLSX.writeFile(wb, `distribuicao_${turno}_${Date.now()}.xlsx`);
+});
+
+document.getElementById("btn-grade-imprimir").addEventListener("click", ()=> imprimirSecao("imprimir-so-grade"));
+</script>
+<!-- ===================== COMENTÁRIOS (CHAT FLUTUANTE, COMPARTILHADO) ===================== -->
+<button id="btn-chat-fab" class="chat-fab" title="Comunicador">💬</button>
+<div id="painel-chat" class="chat-painel">
+  <div class="chat-cabecalho">
+    <span>Comunicador<span class="sub">mensagens somem após 7h</span></span>
+    <button id="btn-chat-fechar" class="chat-fechar" title="Fechar">✕</button>
+  </div>
+  <div id="chat-mensagens" class="chat-mensagens">
+    <div class="chat-vazio">Nenhuma mensagem ainda. Seja o primeiro!</div>
+  </div>
+  <form id="form-chat" class="chat-form">
+    <input id="in-chat-texto" type="text" placeholder="Escreva uma mensagem…" autocomplete="off" maxlength="500">
+    <button type="submit" class="botao principal">Enviar</button>
+  </form>
+</div>
+
+</body>
+</html>
