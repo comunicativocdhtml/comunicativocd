@@ -1108,10 +1108,10 @@ async function tentarEntrar(){
   btn.disabled = true;
   const textoOriginalBtn = btn.textContent;
   btn.textContent = "Entrando…";
-  pedirPermissaoNotificacao(); // pedido feito dentro do clique do usuário (gesto)
   usuarioAtual = usuario;
   const cargoSolicitado = cargoPelaSenha(senhaCargoDigitada); // null, "ADM", "Encarregado" ou "Conferente"
   try{
+    pedirPermissaoNotificacao(); // pedido feito dentro do clique do usuário (gesto)
     await entrarNoPainel(cargoSolicitado);
     sessionStorage.setItem("cargasPiso_usuario", usuario);
     sessionStorage.setItem("cargasPiso_cargoSolicitado", cargoSolicitado || "");
@@ -2172,11 +2172,18 @@ function ehSafari(){
 // para cobrir quem já estava logado antes dessa função existir.
 let permissaoNotifJaPedida = false;
 function pedirPermissaoNotificacao(){
-  if(ehSafari()) return;
-  if(!("Notification" in window)) return;
-  if(Notification.permission === "default" && !permissaoNotifJaPedida){
-    permissaoNotifJaPedida = true;
-    Notification.requestPermission().finally(()=> atualizarBotaoNotif());
+  // Blindado: em alguns navegadores/webviews (apps que abrem o site
+  // embutido, políticas de permissão restritas, etc.) o simples acesso a
+  // "Notification" pode lançar um erro. Isso NUNCA pode travar o login.
+  try{
+    if(ehSafari()) return;
+    if(!("Notification" in window)) return;
+    if(Notification.permission === "default" && !permissaoNotifJaPedida){
+      permissaoNotifJaPedida = true;
+      Notification.requestPermission().finally(()=> atualizarBotaoNotif());
+    }
+  }catch(e){
+    console.error("Erro ao pedir permissão de notificação:", e);
   }
 }
 
@@ -2185,10 +2192,10 @@ function pedirPermissaoNotificacao(){
 // aberto). Requer permissão concedida — se negada ou ainda não decidida,
 // só o toast dentro da página é exibido.
 function mostrarNotificacaoNativa(titulo, corpo){
-  if(ehSafari()) return;
-  if(!("Notification" in window)) return;
-  if(Notification.permission !== "granted") return;
   try{
+    if(ehSafari()) return;
+    if(!("Notification" in window)) return;
+    if(Notification.permission !== "granted") return;
     const n = new Notification(titulo, {
       body: corpo || "",
       tag: "cargas-piso-" + Date.now(),
@@ -2205,30 +2212,40 @@ function mostrarNotificacaoNativa(titulo, corpo){
 function atualizarBotaoNotif(){
   const btn = document.getElementById("btn-notif-status");
   if(!btn) return;
-  if(ehSafari()){
-    btn.textContent = "🔕 Notificações não suportadas no Safari";
+  try{
+    if(ehSafari()){
+      btn.textContent = "🔕 Notificações não suportadas no Safari";
+      btn.disabled = true;
+      return;
+    }
+    if(!("Notification" in window)){
+      btn.textContent = "🔕 Notificações não suportadas neste navegador";
+      btn.disabled = true;
+      return;
+    }
+    if(Notification.permission === "granted"){
+      btn.textContent = "🔔 Notificações do sistema ativadas";
+      btn.disabled = true;
+    } else if(Notification.permission === "denied"){
+      btn.textContent = "🔕 Notificações bloqueadas — libere nas configurações do navegador";
+      btn.disabled = true;
+    } else {
+      btn.textContent = "🔔 Ativar notificações do sistema";
+      btn.disabled = false;
+    }
+  }catch(e){
+    console.error("Erro ao atualizar botão de notificação:", e);
+    btn.textContent = "🔕 Notificações indisponíveis";
     btn.disabled = true;
-    return;
-  }
-  if(!("Notification" in window)){
-    btn.textContent = "🔕 Notificações não suportadas neste navegador";
-    btn.disabled = true;
-    return;
-  }
-  if(Notification.permission === "granted"){
-    btn.textContent = "🔔 Notificações do sistema ativadas";
-    btn.disabled = true;
-  } else if(Notification.permission === "denied"){
-    btn.textContent = "🔕 Notificações bloqueadas — libere nas configurações do navegador";
-    btn.disabled = true;
-  } else {
-    btn.textContent = "🔔 Ativar notificações do sistema";
-    btn.disabled = false;
   }
 }
 document.getElementById("btn-notif-status").addEventListener("click", ()=>{
-  if(ehSafari() || !("Notification" in window)) return;
-  Notification.requestPermission().finally(atualizarBotaoNotif);
+  try{
+    if(ehSafari() || !("Notification" in window)) return;
+    Notification.requestPermission().finally(atualizarBotaoNotif);
+  }catch(e){
+    console.error("Erro ao pedir permissão de notificação:", e);
+  }
 });
 atualizarBotaoNotif();
 
