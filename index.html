@@ -652,32 +652,6 @@
     content:"";position:absolute;top:2px;right:2px;width:12px;height:12px;
     border-radius:50%;background:var(--pendente);border:2px solid var(--com-preto);
   }
-  /* "Modo transparente": quando ninguém abriu o painel, as últimas
-     mensagens ficam visíveis por cima do conteúdo, quase invisíveis
-     (baixa opacidade), só como referência rápida do que está rolando. */
-  .chat-peek{
-    position:fixed;right:22px;bottom:88px;z-index:150;
-    width:280px;max-width:78vw;
-    display:none;flex-direction:column;gap:4px;
-    pointer-events:none;
-    opacity:0.32;
-    transition:opacity .2s ease;
-  }
-  .chat-peek:hover{opacity:0.85;}
-  .chat-peek .chat-peek-msg{
-    background:rgba(11,10,9,0.3);
-    border:1px solid rgba(255,106,26,0.22);
-    border-radius:6px;
-    padding:5px 9px;
-    font-size:11.5px;
-    color:var(--com-texto);
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-  }
-  .chat-peek .chat-peek-autor{color:var(--com-laranja);font-weight:700;margin-right:4px;}
-  @media print{ .chat-peek{display:none!important;} }
-  @media (max-width:480px){ .chat-peek{right:16px;left:16px;width:auto;bottom:78px;} }
   .chat-painel{
     position:fixed;right:22px;bottom:90px;z-index:200;
     width:340px;max-width:88vw;height:min(460px,62vh);
@@ -882,9 +856,7 @@
           <td colspan="3"></td>
           <td id="grade-total-volume">0</td>
           <td id="grade-total-sku">0</td>
-          <td></td>
-          <td id="grade-total-produtivos" class="painel">0</td>
-          <td id="grade-total-fullmix" class="painel">—</td>
+          <td colspan="3"></td>
         </tr>
       </tfoot>
     </table>
@@ -1151,8 +1123,6 @@ async function tentarEntrar(){
     document.getElementById("tela-painel").style.display = "none";
     document.getElementById("tela-login").style.display = "flex";
     document.getElementById("btn-chat-fab").classList.remove("visivel");
-    const peekErro = document.getElementById("chat-peek");
-    if(peekErro){ peekErro.style.display = "none"; peekErro.innerHTML = ""; }
     usuarioAtual = null;
     erro.textContent = "Não foi possível entrar: " + (e && e.message ? e.message : "erro desconhecido") + ". Verifique sua internet e tente de novo.";
   }finally{
@@ -2000,7 +1970,6 @@ function escapeHtml(s){
    ===================================================================== */
 let comentariosVistos = 0; // quantos comentários já foram vistos, p/ o "ponto" de novo no botão
 let unsubComentarios = null;
-let ultimaListaComentarios = []; // última lista recebida, usada pelo "modo transparente" (peek)
 const COM_EXPIRA_MS = 7 * 60 * 60 * 1000; // mensagens do comunicador somem após 7h
 
 function comLabelExpira(criadoEm){
@@ -2032,7 +2001,6 @@ function escutarComentarios(){
           lista.push({ id: doc.id, ...d });
         }
       });
-      ultimaListaComentarios = lista;
       renderizarComentarios(lista);
       // limpeza silenciosa dos documentos que já passaram de 7h
       expirados.forEach(id=> db.collection("comentarios").doc(id).delete().catch(()=>{}));
@@ -2071,27 +2039,6 @@ function renderizarComentarios(lista){
   }else if(lista.length > comentariosVistos){
     fab.classList.add("tem-novo");
   }
-
-  renderizarChatPeek(lista, estaAberto);
-}
-
-// "Modo transparente": para quem não abriu o painel, mostra as últimas
-// mensagens em modo quase invisível (baixa opacidade), só como
-// referência — some assim que o painel completo é aberto.
-function renderizarChatPeek(lista, painelAberto){
-  const peek = document.getElementById("chat-peek");
-  if(!peek) return;
-  if(painelAberto || !lista || lista.length === 0){
-    peek.style.display = "none";
-    peek.innerHTML = "";
-    return;
-  }
-  const ultimas = lista.slice(-3);
-  peek.innerHTML = ultimas.map(c=>{
-    const autor = c.usuario === usuarioAtual ? "Você" : (c.usuario || "—");
-    return `<div class="chat-peek-msg"><span class="chat-peek-autor">${escapeHtml(autor)}:</span>${escapeHtml(c.texto || "")}</div>`;
-  }).join("");
-  peek.style.display = "flex";
 }
 
 // atualiza os rótulos de "some em Xh" mesmo sem mensagens novas chegando
@@ -2112,14 +2059,10 @@ document.getElementById("btn-chat-fab").addEventListener("click", ()=>{
     cont.scrollTop = cont.scrollHeight;
     comentariosVistos = cont.querySelectorAll(".chat-msg").length;
     document.getElementById("in-chat-texto").focus();
-    renderizarChatPeek(ultimaListaComentarios, true);
-  }else{
-    renderizarChatPeek(ultimaListaComentarios, false);
   }
 });
 document.getElementById("btn-chat-fechar").addEventListener("click", ()=>{
   document.getElementById("painel-chat").classList.remove("aberto");
-  renderizarChatPeek(ultimaListaComentarios, false);
 });
 document.getElementById("form-chat").addEventListener("submit", (e)=>{
   e.preventDefault();
@@ -2485,17 +2428,6 @@ function renderizarGradeDistribuicao(){
 
   document.getElementById("grade-total-volume").textContent = totalVolume.toLocaleString("pt-BR");
   document.getElementById("grade-total-sku").textContent = totalSku.toLocaleString("pt-BR");
-
-  // Qtd. Produtivos, Estocado Full e Estocado Mix também entram na
-  // "soma" total da grade (antes ficavam de fora do rodapé).
-  const elTotalProdutivos = document.getElementById("grade-total-produtivos");
-  if(elTotalProdutivos) elTotalProdutivos.textContent = qtdProdutivos ? String(qtdProdutivos) : "0";
-  const elTotalFullMix = document.getElementById("grade-total-fullmix");
-  if(elTotalFullMix){
-    const full = configTurnoAtual.estocadoFull || "—";
-    const mix = configTurnoAtual.estocadoMix || "—";
-    elTotalFullMix.textContent = `Full: ${full}  /  Mix: ${mix}`;
-  }
 }
 
 function formatarDataHoraAgora(){
@@ -2596,16 +2528,11 @@ function montarLinhasGradeParaExport(){
       sku: l?l.sku:"", horaDist: l?l.horaDist:"", qtdProdutivos: painelA, qtdCargas: painelB
     });
   }
-  return {
-    linhas, totalVolume, totalSku, turno,
-    qtdProdutivos,
-    estocadoFull: configTurnoAtual.estocadoFull || "—",
-    estocadoMix: configTurnoAtual.estocadoMix || "—"
-  };
+  return { linhas, totalVolume, totalSku, turno };
 }
 
 function gerarHtmlGrade(){
-  const { linhas, totalVolume, totalSku, turno, qtdProdutivos, estocadoFull, estocadoMix } = montarLinhasGradeParaExport();
+  const { linhas, totalVolume, totalSku, turno } = montarLinhasGradeParaExport();
   const { data, hora } = formatarDataHoraAgora();
   const corpo = linhas.map(l=>`<tr>
     <td>${escapeHtml(l.etiquetagem)}</td><td>${escapeHtml(l.doca)}</td><td>${escapeHtml(l.carga)}</td>
@@ -2628,7 +2555,7 @@ function gerarHtmlGrade(){
   <caption>DISTRIBUIÇÃO ${turno} &nbsp;&nbsp; ${data} &nbsp;&nbsp; ${hora}</caption>
   <thead><tr><th>Etiquetagem</th><th>Doca</th><th>Carga</th><th>Descrição</th><th>Liberação</th><th>D-1</th><th>Volume</th><th>SKU</th><th>Hora Dist.</th><th>Qtd Produtivos</th><th>Qtd Cargas</th></tr></thead>
   <tbody>${corpo}</tbody>
-  <tfoot><tr><td colspan="3" style="text-align:left;">DISTRIBUIÇÃO TOTAL ${turno}</td><td colspan="3"></td><td>${totalVolume.toLocaleString("pt-BR")}</td><td>${totalSku}</td><td></td><td style="background:#c9d3e6;font-weight:700;">${escapeHtml(String(qtdProdutivos||0))}</td><td style="background:#c9d3e6;font-weight:700;">Full: ${escapeHtml(estocadoFull)} / Mix: ${escapeHtml(estocadoMix)}</td></tr></tfoot>
+  <tfoot><tr><td colspan="3" style="text-align:left;">DISTRIBUIÇÃO TOTAL ${turno}</td><td colspan="3"></td><td>${totalVolume.toLocaleString("pt-BR")}</td><td>${totalSku}</td><td colspan="3"></td></tr></tfoot>
 </table>
 </body></html>`;
 }
@@ -2639,13 +2566,13 @@ document.getElementById("btn-grade-baixar-html").addEventListener("click", ()=>{
 });
 
 document.getElementById("btn-grade-baixar-excel").addEventListener("click", ()=>{
-  const { linhas, totalVolume, totalSku, turno, qtdProdutivos, estocadoFull, estocadoMix } = montarLinhasGradeParaExport();
+  const { linhas, totalVolume, totalSku, turno } = montarLinhasGradeParaExport();
   const aoa = [
     ["DISTRIBUIÇÃO " + turno],
     ["Etiquetagem","Doca","Carga","Descrição","Liberação","D-1","Volume","SKU","Hora Dist.","Qtd Produtivos","Qtd Cargas"]
   ];
   linhas.forEach(l=> aoa.push([l.etiquetagem, l.doca, l.carga, l.descricao, l.liberacao, l.d1, l.volume, l.sku, l.horaDist, l.qtdProdutivos, l.qtdCargas]));
-  aoa.push(["DISTRIBUIÇÃO TOTAL " + turno, "", "", "", "", "", totalVolume, totalSku, "", qtdProdutivos||0, `Full: ${estocadoFull} / Mix: ${estocadoMix}`]);
+  aoa.push(["DISTRIBUIÇÃO TOTAL " + turno, "", "", "", "", "", totalVolume, totalSku, "", "", ""]);
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Distribuição " + turno);
@@ -2655,7 +2582,6 @@ document.getElementById("btn-grade-baixar-excel").addEventListener("click", ()=>
 document.getElementById("btn-grade-imprimir").addEventListener("click", ()=> imprimirSecao("imprimir-so-grade"));
 </script>
 <!-- ===================== COMENTÁRIOS (CHAT FLUTUANTE, COMPARTILHADO) ===================== -->
-<div id="chat-peek" class="chat-peek"></div>
 <button id="btn-chat-fab" class="chat-fab" title="Comunicador">💬</button>
 <div id="painel-chat" class="chat-painel">
   <div class="chat-cabecalho">
