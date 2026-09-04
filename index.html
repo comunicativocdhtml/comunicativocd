@@ -1659,68 +1659,99 @@ function textoParaLinhas(texto){
 document.getElementById("btn-adicionar-colar").addEventListener("click", async ()=>{
   const linhasNovas = textoParaLinhas(document.getElementById("area-colar").value);
   if(linhasNovas.length===0){ modalColar.classList.remove("aberto"); return; }
-  const snapAtual = await db.collection("cargas").orderBy("ordem","desc").limit(1).get();
-  let proximaOrdem = snapAtual.empty ? 0 : (snapAtual.docs[0].data().ordem||0)+1;
-  const lote = db.batch();
-  linhasNovas.forEach(linha=>{
-    const ref = db.collection("cargas").doc();
-    lote.set(ref, {...linha, ordem: proximaOrdem++});
-  });
-  await lote.commit();
-  modalColar.classList.remove("aberto");
+  if(!firebaseOk){ alert("Sem conexão com o servidor — não é possível adicionar cargas agora."); return; }
+
+  const btn = document.getElementById("btn-adicionar-colar");
+  const textoOriginal = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Adicionando…";
+  try{
+    const snapAtual = await db.collection("cargas").orderBy("ordem","desc").limit(1).get();
+    let proximaOrdem = snapAtual.empty ? 0 : (snapAtual.docs[0].data().ordem||0)+1;
+    const lote = db.batch();
+    linhasNovas.forEach(linha=>{
+      const ref = db.collection("cargas").doc();
+      lote.set(ref, {...linha, ordem: proximaOrdem++});
+    });
+    await lote.commit();
+    modalColar.classList.remove("aberto");
+  }catch(err){
+    // Se der erro (ex.: sem internet no momento), avisa e mantém o modal
+    // aberto com o texto colado, para não perder o que já foi digitado.
+    console.error("Erro ao adicionar cargas coladas:", err);
+    alert("Não foi possível adicionar as cargas: " + (err && err.message ? err.message : "erro desconhecido") + ". Verifique sua internet e tente de novo.");
+  }finally{
+    btn.disabled = false;
+    btn.textContent = textoOriginal;
+  }
 });
 
 document.getElementById("btn-substituir-colar").addEventListener("click", async ()=>{
   const linhasNovas = textoParaLinhas(document.getElementById("area-colar").value);
   if(linhasNovas.length===0){ modalColar.classList.remove("aberto"); return; }
   if(!confirm(`Isso vai atualizar a tabela com ${linhasNovas.length} carga(s) do relatório colado. Cargas já marcadas como DISTRIBUÍDA que não estiverem nesse relatório novo serão mantidas (não somem). Continuar?`)) return;
+  if(!firebaseOk){ alert("Sem conexão com o servidor — não é possível atualizar o relatório agora."); return; }
 
-  // Identifica cada carga existente pelo número da carga, para não perder
-  // a marcação de distribuída quando o relatório for atualizado.
-  const snapExistentes = await db.collection("cargas").get();
-  const existentesPorCarga = new Map(); // chave = nº da carga -> {id, data}
-  snapExistentes.forEach(doc=>{
-    const data = doc.data();
-    const chave = (data.carga||"").trim();
-    if(chave) existentesPorCarga.set(chave, {id:doc.id, data});
-  });
+  const btn = document.getElementById("btn-substituir-colar");
+  const textoOriginal = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Atualizando…";
+  try{
+    // Identifica cada carga existente pelo número da carga, para não perder
+    // a marcação de distribuída quando o relatório for atualizado.
+    const snapExistentes = await db.collection("cargas").get();
+    const existentesPorCarga = new Map(); // chave = nº da carga -> {id, data}
+    snapExistentes.forEach(doc=>{
+      const data = doc.data();
+      const chave = (data.carga||"").trim();
+      if(chave) existentesPorCarga.set(chave, {id:doc.id, data});
+    });
 
-  const lote = db.batch();
-  const chavesUsadas = new Set();
-  let ordem = 0;
+    const lote = db.batch();
+    const chavesUsadas = new Set();
+    let ordem = 0;
 
-  linhasNovas.forEach(linha=>{
-    const chave = (linha.carga||"").trim();
-    const existente = chave ? existentesPorCarga.get(chave) : null;
-    if(existente){
-      chavesUsadas.add(chave);
-      // mantém os dados de distribuição já gravados para essa carga
-      const preservado = {
-        distribuido: existente.data.distribuido || false,
-        turnoDist: existente.data.turnoDist || "",
-        horaDist: existente.data.horaDist || "",
-        marcadoPor: existente.data.marcadoPor || ""
-      };
-      lote.set(db.collection("cargas").doc(existente.id), {...linha, ...preservado, ordem: ordem++});
-    } else {
-      lote.set(db.collection("cargas").doc(), {...linha, ordem: ordem++});
-    }
-  });
+    linhasNovas.forEach(linha=>{
+      const chave = (linha.carga||"").trim();
+      const existente = chave ? existentesPorCarga.get(chave) : null;
+      if(existente){
+        chavesUsadas.add(chave);
+        // mantém os dados de distribuição já gravados para essa carga
+        const preservado = {
+          distribuido: existente.data.distribuido || false,
+          turnoDist: existente.data.turnoDist || "",
+          horaDist: existente.data.horaDist || "",
+          marcadoPor: existente.data.marcadoPor || ""
+        };
+        lote.set(db.collection("cargas").doc(existente.id), {...linha, ...preservado, ordem: ordem++});
+      } else {
+        lote.set(db.collection("cargas").doc(), {...linha, ordem: ordem++});
+      }
+    });
 
-  // Cargas que não vieram no novo relatório: se já estavam distribuídas,
-  // continuam no painel (no fim da lista) em vez de sumir; caso contrário
-  // são removidas por não fazerem mais parte do relatório atual.
-  existentesPorCarga.forEach((existente, chave)=>{
-    if(chavesUsadas.has(chave)) return;
-    if(existente.data.distribuido){
-      lote.set(db.collection("cargas").doc(existente.id), {...existente.data, ordem: ordem++});
-    } else {
-      lote.delete(db.collection("cargas").doc(existente.id));
-    }
-  });
+    // Cargas que não vieram no novo relatório: se já estavam distribuídas,
+    // continuam no painel (no fim da lista) em vez de sumir; caso contrário
+    // são removidas por não fazerem mais parte do relatório atual.
+    existentesPorCarga.forEach((existente, chave)=>{
+      if(chavesUsadas.has(chave)) return;
+      if(existente.data.distribuido){
+        lote.set(db.collection("cargas").doc(existente.id), {...existente.data, ordem: ordem++});
+      } else {
+        lote.delete(db.collection("cargas").doc(existente.id));
+      }
+    });
 
-  await lote.commit();
-  modalColar.classList.remove("aberto");
+    await lote.commit();
+    modalColar.classList.remove("aberto");
+  }catch(err){
+    // Se der erro (ex.: sem internet no momento), avisa e mantém o modal
+    // aberto com o texto colado, para não perder o que já foi digitado.
+    console.error("Erro ao atualizar relatório colado:", err);
+    alert("Não foi possível atualizar o relatório: " + (err && err.message ? err.message : "erro desconhecido") + ". Verifique sua internet e tente de novo.");
+  }finally{
+    btn.disabled = false;
+    btn.textContent = textoOriginal;
+  }
 });
 
 /* =====================================================================
